@@ -19,9 +19,8 @@ def get_settings():
         'masked_api_key': masked_key,
         'system_prompt': settings.DEFAULT_SYSTEM_PROMPT,
         'available_models': [
-            {'id': 'gemini-2.0-flash', 'name': 'Gemini 2.0 Flash (Recomandat, Rapid)'},
-            {'id': 'gemini-1.5-pro', 'name': 'Gemini 1.5 Pro (Raționament Avansat)'},
-            {'id': 'gemini-1.5-flash', 'name': 'Gemini 1.5 Flash (Economic)'}
+            {'id': 'gemini-3.6-flash', 'name': 'Gemini 3.6 Flash (Recomandat, Cel mai nou)'},
+            {'id': 'gemini-2.0-flash', 'name': 'Gemini 2.0 Flash'},
         ]
     }
 

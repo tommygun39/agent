@@ -18,7 +18,7 @@ class Settings:
     
     # AI Model Settings
     GEMINI_API_KEY: str = os.getenv('GEMINI_API_KEY', '')
-    DEFAULT_MODEL: str = os.getenv('DEFAULT_MODEL', 'gemini-2.0-flash')
+    DEFAULT_MODEL: str = os.getenv('DEFAULT_MODEL', 'gemini-3.6-flash')
     
     # Database
     DATABASE_URL: str = os.getenv('DATABASE_URL', f'sqlite:///{DATA_DIR}/agent.db')

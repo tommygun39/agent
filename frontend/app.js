@@ -492,7 +492,7 @@ async function loadSettings() {
     const data = await res.json();
     assistantNameInput.value = data.assistant_name || "Pandele";
     systemPromptInput.value = data.system_prompt || "";
-    modelSelect.value = data.default_model || "gemini-2.0-flash";
+    modelSelect.value = data.default_model || "gemini-3.6-flash";
     if (data.has_api_key) {
       apiKeyStatus.innerText = "Configurat ✓ (" + data.masked_api_key + ")";
       apiKeyStatus.className = "text-emerald-400 font-medium";
