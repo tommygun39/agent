@@ -74,11 +74,26 @@ def init_db():
             updated_at TEXT NOT NULL
         )
     ''')
+
+    # 6. Reminders & Tasks table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS reminders (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            due_date_time TEXT NOT NULL,
+            priority TEXT DEFAULT 'normal',
+            category TEXT DEFAULT 'general',
+            is_completed INTEGER DEFAULT 0,
+            google_event_id TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    ''')
     
     conn.commit()
     conn.close()
 
-# Math helper for cosine similarity
 def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
     if not vec1 or not vec2 or len(vec1) != len(vec2):
         return 0.0
