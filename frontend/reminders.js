@@ -1,8 +1,12 @@
-// Reminders Module for Momo Agent with Live Audio Chimes & Push Notifications
+// Reminders Module for Momo Agent with Live Audio Alarm, Web Audio Chimes & Push Notifications
 let currentRemFilter = "all";
 const alertedReminderIds = new Set();
 let activeAlarmReminder = null;
+let alarmAudioInterval = null;
+let globalAudioCtx = null;
+let isAudioUnlocked = false;
 
+// DOM Elements
 const remindersCardList = document.getElementById("remindersCardList");
 const openNewReminderModalBtn = document.getElementById("openNewReminderModalBtn");
 const newReminderModal = document.getElementById("newReminderModal");
@@ -15,51 +19,125 @@ const remInputPriority = document.getElementById("remInputPriority");
 const remInputCategory = document.getElementById("remInputCategory");
 
 const enableNotificationsBtn = document.getElementById("enableNotificationsBtn");
+const testAndEnableAudioBtn = document.getElementById("testAndEnableAudioBtn");
+const audioUnlockBanner = document.getElementById("audioUnlockBanner");
 const reminderAlarmModal = document.getElementById("reminderAlarmModal");
 const alarmModalTitle = document.getElementById("alarmModalTitle");
 const alarmModalTime = document.getElementById("alarmModalTime");
 const alarmDismissBtn = document.getElementById("alarmDismissBtn");
 const alarmCompleteBtn = document.getElementById("alarmCompleteBtn");
 
-// 1. Crystal-clear harmonic Audio Chime via Web Audio API
-function playReminderChime() {
-  try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
-    if (ctx.state === "suspended") {
-      ctx.resume();
+// 1. Web Audio Unlocker (Crucial for iOS Safari & Android Chrome autoplay policy)
+function getAudioContext() {
+  if (!globalAudioCtx) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) {
+      globalAudioCtx = new AudioContextClass();
     }
-    const now = ctx.currentTime;
+  }
+  if (globalAudioCtx && globalAudioCtx.state === "suspended") {
+    globalAudioCtx.resume().catch(() => {});
+  }
+  return globalAudioCtx;
+}
 
-    const notes = [
-      { freq: 587.33, start: 0.0, dur: 0.4 },  // D5
-      { freq: 739.99, start: 0.12, dur: 0.5 }, // F#5
-      { freq: 880.00, start: 0.24, dur: 0.6 }, // A5
-      { freq: 1174.66, start: 0.36, dur: 1.2 } // D6
-    ];
-
-    notes.forEach(n => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(n.freq, now + n.start);
-
-      gain.gain.setValueAtTime(0.001, now + n.start);
-      gain.gain.exponentialRampToValueAtTime(0.35, now + n.start + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + n.start + n.dur);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now + n.start);
-      osc.stop(now + n.start + n.dur);
-    });
-  } catch (e) {
-    console.warn("Chime playback error:", e);
+function unlockAudioGlobal() {
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === "suspended") {
+    ctx.resume().then(() => {
+      isAudioUnlocked = true;
+    }).catch(() => {});
+  } else if (ctx && ctx.state === "running") {
+    isAudioUnlocked = true;
   }
 }
 
-// 2. Text-To-Speech announcement
+// Attach silent unlock to all user touches/clicks anywhere
+["click", "touchstart", "touchend", "keydown"].forEach((evt) => {
+  document.addEventListener(evt, unlockAudioGlobal, { passive: true });
+});
+
+// 2. Loud, energetic alarm sound generator (High-volume harmonic bell chimes)
+function playLoudAlarmTone() {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+    const now = ctx.currentTime;
+
+    // 4 powerful, bright bell harmonics: A5 (880Hz), C#6 (1108Hz), E6 (1318Hz), A6 (1760Hz)
+    const tones = [
+      { freq: 880.00, start: 0.0, dur: 0.25, gain: 0.8 },
+      { freq: 1108.73, start: 0.12, dur: 0.25, gain: 0.85 },
+      { freq: 1318.51, start: 0.24, dur: 0.4, gain: 0.9 },
+      { freq: 1760.00, start: 0.38, dur: 0.8, gain: 0.95 }
+    ];
+
+    tones.forEach(t => {
+      const osc = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(t.freq, now + t.start);
+
+      gainNode.gain.setValueAtTime(0.001, now + t.start);
+      gainNode.gain.exponentialRampToValueAtTime(t.gain, now + t.start + 0.02);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, now + t.start + t.dur);
+
+      osc.connect(gainNode);
+      gainNode.connect(ctx.destination);
+
+      osc.start(now + t.start);
+      osc.stop(now + t.start + t.dur);
+    });
+  } catch (e) {
+    console.warn("Alarm sound error:", e);
+  }
+}
+
+// 3. Continuous repeating alarm loop (rings until user taps Dismiss or Complete)
+function startAlarmLoop(rem) {
+  stopAlarmLoop();
+  activeAlarmReminder = rem;
+
+  // 1. Play sound immediately and repeat every 2.2 seconds!
+  playLoudAlarmTone();
+  alarmAudioInterval = setInterval(playLoudAlarmTone, 2200);
+
+  // 2. Vibrate phone in energetic pulses
+  if ("vibrate" in navigator) {
+    try { navigator.vibrate([500, 200, 500, 200, 500, 200, 1000]); } catch(e) {}
+  }
+
+  // 3. Text-to-speech voice announcement
+  speakReminder(rem.title);
+
+  // 4. Native web/push notification
+  sendNativeNotification(rem);
+
+  // 5. Display interactive alarm modal
+  showAlarmModal(rem);
+}
+
+function stopAlarmLoop() {
+  if (alarmAudioInterval) {
+    clearInterval(alarmAudioInterval);
+    alarmAudioInterval = null;
+  }
+  if ("vibrate" in navigator) {
+    try { navigator.vibrate(0); } catch(e) {}
+  }
+  if ("speechSynthesis" in window) {
+    try { window.speechSynthesis.cancel(); } catch(e) {}
+  }
+  if (reminderAlarmModal) {
+    reminderAlarmModal.classList.add("hidden");
+  }
+  activeAlarmReminder = null;
+}
+
+// 4. Voice announcement
 function speakReminder(title) {
   if (!("speechSynthesis" in window)) return;
   try {
@@ -71,70 +149,37 @@ function speakReminder(title) {
   } catch (e) {}
 }
 
-// 3. Notification Permissions
-function updateNotificationButtonState() {
-  if (!enableNotificationsBtn) return;
-  if (!("Notification" in window)) {
-    enableNotificationsBtn.style.display = "none";
-    return;
-  }
-  if (Notification.permission === "granted") {
-    enableNotificationsBtn.className = "p-2 rounded-lg text-emerald-400 hover:bg-slate-800 transition flex items-center gap-1";
-    enableNotificationsBtn.title = "Alerte & Notificări Sonore Active ✓";
-  } else if (Notification.permission === "denied") {
-    enableNotificationsBtn.className = "p-2 rounded-lg text-slate-500 hover:bg-slate-800 transition flex items-center gap-1";
-    enableNotificationsBtn.title = "Notificările sunt blocate din setările browserului";
+// 5. Native Notifications
+function sendNativeNotification(rem) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+  const title = `🔔 Pandele: ${rem.title}`;
+  const options = {
+    body: `Scadență atinsă! Prioritate: ${rem.priority || "normal"}`,
+    icon: "/static/icons/icon-192.png",
+    badge: "/static/icons/icon-192.png",
+    vibrate: [500, 200, 500, 200, 500],
+    tag: rem.id,
+    renotify: true,
+    requireInteraction: true,
+    data: { url: "/" }
+  };
+
+  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({
+      type: "SHOW_REMINDER_NOTIFICATION",
+      title: title,
+      body: options.body,
+      tag: rem.id
+    });
   } else {
-    enableNotificationsBtn.className = "p-2 rounded-lg text-amber-400 hover:bg-slate-800 transition flex items-center gap-1 animate-pulse";
-    enableNotificationsBtn.title = "Apasă pentru a activa Alertele & Notificările Sonore";
-  }
-  lucide.createIcons();
-}
-
-async function requestNotificationPermission(userTriggered = false) {
-  if (!("Notification" in window)) return;
-  if (Notification.permission === "default" || userTriggered) {
     try {
-      const perm = await Notification.requestPermission();
-      updateNotificationButtonState();
-      if (perm === "granted") {
-        playReminderChime();
-      }
-    } catch (e) {}
+      new Notification(title, options);
+    } catch(e) {}
   }
 }
 
-// 4. Trigger Alarm
-function triggerReminderAlarm(rem) {
-  activeAlarmReminder = rem;
-  
-  playReminderChime();
-
-  if ("vibrate" in navigator) {
-    try { navigator.vibrate([300, 150, 300, 150, 300]); } catch(e) {}
-  }
-
-  speakReminder(rem.title);
-
-  if ("Notification" in window && Notification.permission === "granted") {
-    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({
-        type: "SHOW_REMINDER_NOTIFICATION",
-        title: "🔔 Pandele: Reminder Scadent!",
-        body: rem.title,
-        tag: rem.id
-      });
-    } else {
-      try {
-        new Notification("🔔 Pandele: Reminder Scadent!", {
-          body: rem.title,
-          icon: "/static/icons/icon-192.png",
-          tag: rem.id
-        });
-      } catch(e) {}
-    }
-  }
-
+function showAlarmModal(rem) {
   if (reminderAlarmModal && alarmModalTitle) {
     alarmModalTitle.innerText = rem.title;
     let timeFormatted = rem.due_date_time;
@@ -147,21 +192,99 @@ function triggerReminderAlarm(rem) {
   }
 }
 
-// 5. Periodic due checker
+// 6. Periodic Due Reminders Checker
 async function checkDueReminders() {
   try {
     const res = await fetch("/api/reminders/due");
     if (!res.ok) return;
     const dueList = await res.json();
-    
+
     for (const rem of dueList) {
       if (!alertedReminderIds.has(rem.id)) {
         alertedReminderIds.add(rem.id);
-        triggerReminderAlarm(rem);
-        break;
+        startAlarmLoop(rem);
+        break; // Trigger one alarm at a time
       }
     }
   } catch (err) {}
+}
+
+// 7. Notification Button & Banner state
+function updateNotificationButtonState() {
+  if (!enableNotificationsBtn) return;
+  if (!("Notification" in window)) {
+    enableNotificationsBtn.style.display = "none";
+    return;
+  }
+  if (Notification.permission === "granted") {
+    enableNotificationsBtn.className = "p-2 rounded-lg text-emerald-400 hover:bg-slate-800 transition flex items-center gap-1";
+    enableNotificationsBtn.title = "Alerte Sonore & Notificări Active ✓";
+  } else {
+    enableNotificationsBtn.className = "p-2 rounded-lg text-amber-400 hover:bg-slate-800 transition flex items-center gap-1 animate-pulse";
+    enableNotificationsBtn.title = "Apasă pentru a activa Alerte & Notificări";
+  }
+  lucide.createIcons();
+}
+
+async function requestNotificationPermission(userTriggered = false) {
+  unlockAudioGlobal();
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "default" || userTriggered) {
+    try {
+      const perm = await Notification.requestPermission();
+      updateNotificationButtonState();
+      return perm;
+    } catch (e) {}
+  }
+  return Notification.permission;
+}
+
+// 8. Test Sound & Notification Button Handlers
+function initAudioBanner() {
+  const isTested = localStorage.getItem("pandele_audio_tested") === "true";
+  if (isTested && Notification.permission === "granted") {
+    if (audioUnlockBanner) audioUnlockBanner.style.display = "none";
+  }
+
+  testAndEnableAudioBtn?.addEventListener("click", async () => {
+    unlockAudioGlobal();
+    // 1. Play loud chime right now!
+    playLoudAlarmTone();
+    setTimeout(playLoudAlarmTone, 700);
+
+    // 2. Request notification permission
+    const perm = await requestNotificationPermission(true);
+
+    // 3. Vibrate
+    if ("vibrate" in navigator) {
+      try { navigator.vibrate([200, 100, 200]); } catch(e) {}
+    }
+
+    // 4. Test TTS
+    speakReminder("Test sunet și alarme reușit!");
+
+    // 5. Send test notification
+    if (perm === "granted") {
+      try {
+        new Notification("🔔 Pandele: Alerte Active!", {
+          body: "Sunetul de alarmă și notificările sunt activate pe acest telefon!",
+          icon: "/static/icons/icon-192.png"
+        });
+      } catch(e) {}
+    }
+
+    // 6. Update UI
+    localStorage.setItem("pandele_audio_tested", "true");
+    testAndEnableAudioBtn.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4"></i><span>Sunet & Alerte Active ✓</span>`;
+    testAndEnableAudioBtn.className = "px-3.5 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs shadow-md transition flex items-center gap-1.5";
+    lucide.createIcons();
+
+    setTimeout(() => {
+      if (audioUnlockBanner) {
+        audioUnlockBanner.classList.add("hidden");
+      }
+    }, 3500);
+  });
 }
 
 function initReminders() {
@@ -186,21 +309,21 @@ function initReminders() {
   cancelNewReminderBtn?.addEventListener("click", () => newReminderModal.classList.add("hidden"));
   saveNewReminderBtn?.addEventListener("click", saveNewReminder);
 
-  // Notification button in header
   enableNotificationsBtn?.addEventListener("click", () => {
     requestNotificationPermission(true);
+    playLoudAlarmTone();
   });
   updateNotificationButtonState();
+  initAudioBanner();
 
-  // Alarm modal action buttons
+  // Alarm modal buttons
   alarmCompleteBtn?.addEventListener("click", async () => {
     if (activeAlarmReminder) {
       await fetch(`/api/reminders/${activeAlarmReminder.id}/toggle`, { method: "POST" });
       loadReminders(currentRemFilter);
       loadRemindersCount();
     }
-    reminderAlarmModal.classList.add("hidden");
-    activeAlarmReminder = null;
+    stopAlarmLoop();
   });
 
   alarmDismissBtn?.addEventListener("click", async () => {
@@ -210,12 +333,11 @@ function initReminders() {
       loadReminders(currentRemFilter);
       loadRemindersCount();
     }
-    reminderAlarmModal.classList.add("hidden");
-    activeAlarmReminder = null;
+    stopAlarmLoop();
   });
 
-  // Start background monitoring every 15 seconds
-  setInterval(checkDueReminders, 15000);
+  // Background monitoring every 10 seconds
+  setInterval(checkDueReminders, 10000);
   checkDueReminders();
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") checkDueReminders();
@@ -351,5 +473,5 @@ async function saveNewReminder() {
 
 window.loadReminders = loadReminders;
 window.loadRemindersCount = loadRemindersCount;
-window.playReminderChime = playReminderChime;
+window.playLoudAlarmTone = playLoudAlarmTone;
 window.checkDueReminders = checkDueReminders;

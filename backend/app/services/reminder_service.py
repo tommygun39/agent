@@ -145,18 +145,29 @@ class ReminderService:
         """Găsește toate reminderele nefinalizate a căror scadență a sosit raportat la ora României."""
         conn = get_db_connection()
         cursor = conn.cursor()
-        now_str = now_ro_iso()
-        cursor.execute(
-            'SELECT * FROM reminders WHERE is_completed = 0 AND due_date_time <= ? ORDER BY due_date_time ASC',
-            (now_str,)
-        )
+        cursor.execute('SELECT * FROM reminders WHERE is_completed = 0')
         rows = cursor.fetchall()
         conn.close()
+
+        now_dt = now_ro()
+        now_clean = now_dt.strftime('%Y-%m-%dT%H:%M:%S')
+
         results = []
         for r in rows:
             d = dict(r)
             d['is_completed'] = bool(d['is_completed'])
-            results.append(d)
+            due_raw = str(d.get('due_date_time', '')).strip()
+            due_clean = due_raw.replace(' ', 'T')
+            if len(due_clean) == 16:
+                due_clean += ':00'
+            if '+' in due_clean:
+                due_clean = due_clean.split('+')[0]
+            if due_clean.endswith('Z'):
+                due_clean = due_clean[:-1]
+
+            if due_clean and due_clean <= now_clean:
+                results.append(d)
+
         return results
 
     @staticmethod
