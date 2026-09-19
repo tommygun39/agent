@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 from pydantic import BaseModel
 from backend.app.services.reminder_service import ReminderService
@@ -23,6 +23,10 @@ class ReminderUpdate(BaseModel):
 def get_reminders(filter_type: str = Query('all', enum=['all', 'today', 'upcoming', 'completed'])):
     return ReminderService.list_reminders(filter_type)
 
+@router.get('/reminders/due')
+def get_due_reminders():
+    return ReminderService.get_due_reminders()
+
 @router.post('/reminders')
 def create_reminder(data: ReminderCreate):
     if not data.title.strip():
@@ -38,6 +42,13 @@ def create_reminder(data: ReminderCreate):
 @router.post('/reminders/{reminder_id}/toggle')
 def toggle_reminder(reminder_id: str):
     res = ReminderService.toggle_reminder(reminder_id)
+    if not res:
+        raise HTTPException(status_code=404, detail="Reminderul nu a fost găsit")
+    return res
+
+@router.post('/reminders/{reminder_id}/snooze')
+def snooze_reminder(reminder_id: str, minutes: int = Query(10, ge=1, le=1440)):
+    res = ReminderService.snooze_reminder(reminder_id, minutes)
     if not res:
         raise HTTPException(status_code=404, detail="Reminderul nu a fost găsit")
     return res

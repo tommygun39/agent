@@ -1,5 +1,7 @@
-﻿// Reminders Module for Momo Agent
+// Reminders Module for Momo Agent with Live Audio Chimes & Push Notifications
 let currentRemFilter = "all";
+const alertedReminderIds = new Set();
+let activeAlarmReminder = null;
 
 const remindersCardList = document.getElementById("remindersCardList");
 const openNewReminderModalBtn = document.getElementById("openNewReminderModalBtn");
@@ -11,6 +13,156 @@ const remInputTitle = document.getElementById("remInputTitle");
 const remInputDue = document.getElementById("remInputDue");
 const remInputPriority = document.getElementById("remInputPriority");
 const remInputCategory = document.getElementById("remInputCategory");
+
+const enableNotificationsBtn = document.getElementById("enableNotificationsBtn");
+const reminderAlarmModal = document.getElementById("reminderAlarmModal");
+const alarmModalTitle = document.getElementById("alarmModalTitle");
+const alarmModalTime = document.getElementById("alarmModalTime");
+const alarmDismissBtn = document.getElementById("alarmDismissBtn");
+const alarmCompleteBtn = document.getElementById("alarmCompleteBtn");
+
+// 1. Crystal-clear harmonic Audio Chime via Web Audio API
+function playReminderChime() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    if (ctx.state === "suspended") {
+      ctx.resume();
+    }
+    const now = ctx.currentTime;
+
+    const notes = [
+      { freq: 587.33, start: 0.0, dur: 0.4 },  // D5
+      { freq: 739.99, start: 0.12, dur: 0.5 }, // F#5
+      { freq: 880.00, start: 0.24, dur: 0.6 }, // A5
+      { freq: 1174.66, start: 0.36, dur: 1.2 } // D6
+    ];
+
+    notes.forEach(n => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(n.freq, now + n.start);
+
+      gain.gain.setValueAtTime(0.001, now + n.start);
+      gain.gain.exponentialRampToValueAtTime(0.35, now + n.start + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + n.start + n.dur);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + n.start);
+      osc.stop(now + n.start + n.dur);
+    });
+  } catch (e) {
+    console.warn("Chime playback error:", e);
+  }
+}
+
+// 2. Text-To-Speech announcement
+function speakReminder(title) {
+  if (!("speechSynthesis" in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(`Atenție! Reminder de la Pandele: ${title}`);
+    utterance.lang = "ro-RO";
+    utterance.rate = 1.0;
+    window.speechSynthesis.speak(utterance);
+  } catch (e) {}
+}
+
+// 3. Notification Permissions
+function updateNotificationButtonState() {
+  if (!enableNotificationsBtn) return;
+  if (!("Notification" in window)) {
+    enableNotificationsBtn.style.display = "none";
+    return;
+  }
+  if (Notification.permission === "granted") {
+    enableNotificationsBtn.className = "p-2 rounded-lg text-emerald-400 hover:bg-slate-800 transition flex items-center gap-1";
+    enableNotificationsBtn.title = "Alerte & Notificări Sonore Active ✓";
+  } else if (Notification.permission === "denied") {
+    enableNotificationsBtn.className = "p-2 rounded-lg text-slate-500 hover:bg-slate-800 transition flex items-center gap-1";
+    enableNotificationsBtn.title = "Notificările sunt blocate din setările browserului";
+  } else {
+    enableNotificationsBtn.className = "p-2 rounded-lg text-amber-400 hover:bg-slate-800 transition flex items-center gap-1 animate-pulse";
+    enableNotificationsBtn.title = "Apasă pentru a activa Alertele & Notificările Sonore";
+  }
+  lucide.createIcons();
+}
+
+async function requestNotificationPermission(userTriggered = false) {
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "default" || userTriggered) {
+    try {
+      const perm = await Notification.requestPermission();
+      updateNotificationButtonState();
+      if (perm === "granted") {
+        playReminderChime();
+      }
+    } catch (e) {}
+  }
+}
+
+// 4. Trigger Alarm
+function triggerReminderAlarm(rem) {
+  activeAlarmReminder = rem;
+  
+  playReminderChime();
+
+  if ("vibrate" in navigator) {
+    try { navigator.vibrate([300, 150, 300, 150, 300]); } catch(e) {}
+  }
+
+  speakReminder(rem.title);
+
+  if ("Notification" in window && Notification.permission === "granted") {
+    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: "SHOW_REMINDER_NOTIFICATION",
+        title: "🔔 Pandele: Reminder Scadent!",
+        body: rem.title,
+        tag: rem.id
+      });
+    } else {
+      try {
+        new Notification("🔔 Pandele: Reminder Scadent!", {
+          body: rem.title,
+          icon: "/static/icons/icon-192.png",
+          tag: rem.id
+        });
+      } catch(e) {}
+    }
+  }
+
+  if (reminderAlarmModal && alarmModalTitle) {
+    alarmModalTitle.innerText = rem.title;
+    let timeFormatted = rem.due_date_time;
+    try {
+      timeFormatted = new Date(rem.due_date_time).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" });
+    } catch(e) {}
+    if (alarmModalTime) alarmModalTime.innerText = `Scadență: ${timeFormatted}`;
+    reminderAlarmModal.classList.remove("hidden");
+    lucide.createIcons();
+  }
+}
+
+// 5. Periodic due checker
+async function checkDueReminders() {
+  try {
+    const res = await fetch("/api/reminders/due");
+    if (!res.ok) return;
+    const dueList = await res.json();
+    
+    for (const rem of dueList) {
+      if (!alertedReminderIds.has(rem.id)) {
+        alertedReminderIds.add(rem.id);
+        triggerReminderAlarm(rem);
+        break;
+      }
+    }
+  } catch (err) {}
+}
 
 function initReminders() {
   document.querySelectorAll(".rem-filter-btn").forEach((btn) => {
@@ -33,6 +185,41 @@ function initReminders() {
   closeNewReminderModal?.addEventListener("click", () => newReminderModal.classList.add("hidden"));
   cancelNewReminderBtn?.addEventListener("click", () => newReminderModal.classList.add("hidden"));
   saveNewReminderBtn?.addEventListener("click", saveNewReminder);
+
+  // Notification button in header
+  enableNotificationsBtn?.addEventListener("click", () => {
+    requestNotificationPermission(true);
+  });
+  updateNotificationButtonState();
+
+  // Alarm modal action buttons
+  alarmCompleteBtn?.addEventListener("click", async () => {
+    if (activeAlarmReminder) {
+      await fetch(`/api/reminders/${activeAlarmReminder.id}/toggle`, { method: "POST" });
+      loadReminders(currentRemFilter);
+      loadRemindersCount();
+    }
+    reminderAlarmModal.classList.add("hidden");
+    activeAlarmReminder = null;
+  });
+
+  alarmDismissBtn?.addEventListener("click", async () => {
+    if (activeAlarmReminder) {
+      await fetch(`/api/reminders/${activeAlarmReminder.id}/snooze?minutes=10`, { method: "POST" });
+      alertedReminderIds.delete(activeAlarmReminder.id); // allow it to alert again in 10 mins
+      loadReminders(currentRemFilter);
+      loadRemindersCount();
+    }
+    reminderAlarmModal.classList.add("hidden");
+    activeAlarmReminder = null;
+  });
+
+  // Start background monitoring every 15 seconds
+  setInterval(checkDueReminders, 15000);
+  checkDueReminders();
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") checkDueReminders();
+  });
 }
 
 function setDefaultDueDateTime() {
@@ -164,3 +351,5 @@ async function saveNewReminder() {
 
 window.loadReminders = loadReminders;
 window.loadRemindersCount = loadRemindersCount;
+window.playReminderChime = playReminderChime;
+window.checkDueReminders = checkDueReminders;

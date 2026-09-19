@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'momo-agent-v1';
+const CACHE_NAME = 'momo-agent-v1';
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json',
@@ -60,6 +60,38 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
       );
+    })
+  );
+});
+
+// Handle Background Notifications from App
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SHOW_REMINDER_NOTIFICATION') {
+    self.registration.showNotification(event.data.title || '🔔 Pandele: Reminder!', {
+      body: event.data.body || 'Un reminder important a ajuns la scadență.',
+      icon: '/static/icons/icon-192.png',
+      badge: '/static/icons/icon-192.png',
+      vibrate: [200, 100, 200, 100, 200],
+      tag: event.data.tag || 'pandele-reminder',
+      renotify: true,
+      requireInteraction: true,
+      data: { url: '/' }
+    });
+  }
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow('/');
+      }
     })
   );
 });

@@ -62,6 +62,16 @@ def test_all():
     assert any(rem["id"] == rem_id for rem in r.json())
     print("   [OK] Listed reminders successfully")
 
+    # Due reminders
+    r = client.get("/api/reminders/due")
+    assert r.status_code == 200
+    print("   [OK] Due reminders API returned successfully:", len(r.json()), "due")
+
+    # Snooze reminder
+    r = client.post(f"/api/reminders/{rem_id}/snooze?minutes=15")
+    assert r.status_code == 200
+    print("   [OK] Snooze reminder 15 min OK")
+
     print("7. Testing Tools API (Pawn Commission)...")
     r = client.post("/api/tools/pawn-commission?principal=2000&days=10&rate=0.3")
     assert r.status_code == 200

@@ -160,6 +160,10 @@
             </select>
           </div>
 
+          <button id="enableNotificationsBtn" title="Alerte & Notificări Sonore Active" class="p-2 rounded-lg text-amber-400 hover:bg-slate-800 hover:text-amber-300 transition flex items-center gap-1">
+            <i data-lucide="bell" class="w-4 h-4"></i>
+          </button>
+
           <button id="openToolsBtn" title="Calculator & Amanet" class="p-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition">
             <i data-lucide="calculator" class="w-4 h-4"></i>
           </button>
@@ -505,6 +509,31 @@
           <div class="flex justify-between"><span>Total de rambursat:</span> <strong id="resTotal" class="text-emerald-400">0 LEI</strong></div>
           <div class="text-[10px] text-slate-500 mt-1">* Se aplică minim 5 zile și comision minim 10 LEI.</div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ALARME / REMINDER DUE ALERT -->
+  <div id="reminderAlarmModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] hidden flex items-center justify-center p-4">
+    <div class="bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-indigo-500/80 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl shadow-indigo-500/30 animate-in zoom-in duration-200 p-6 text-center">
+      <div class="w-16 h-16 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto mb-4 animate-bounce">
+        <i data-lucide="bell-ring" class="w-8 h-8 text-indigo-400"></i>
+      </div>
+      <div class="text-xs font-semibold uppercase tracking-wider text-indigo-400 mb-1 flex items-center justify-center gap-1">
+        <span>⏰ Notificare Pandele</span>
+      </div>
+      <h3 id="alarmModalTitle" class="text-xl font-bold text-white mb-2 leading-tight">Titlu Reminder</h3>
+      <p id="alarmModalTime" class="text-xs text-slate-400 mb-6 flex items-center justify-center gap-1">
+        <i data-lucide="clock" class="w-3.5 h-3.5"></i> Scadență atinsă
+      </p>
+
+      <div class="flex flex-col sm:flex-row gap-2">
+        <button id="alarmDismissBtn" class="flex-1 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs transition flex items-center justify-center gap-1.5">
+          <i data-lucide="clock" class="w-4 h-4"></i> Amână 10 min
+        </button>
+        <button id="alarmCompleteBtn" class="flex-1 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-500/30 transition flex items-center justify-center gap-1.5">
+          <i data-lucide="check-circle-2" class="w-4 h-4"></i> Finalizează
+        </button>
       </div>
     </div>
   </div>

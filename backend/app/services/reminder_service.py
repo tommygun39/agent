@@ -1,7 +1,8 @@
 import uuid
+from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from backend.app.core.database import get_db_connection
-from backend.app.core.timezone import now_ro_iso, today_ro_str
+from backend.app.core.timezone import now_ro, now_ro_iso, today_ro_str
 
 class ReminderService:
     @staticmethod
@@ -129,6 +130,54 @@ class ReminderService:
         params.append(now)
         params.append(reminder_id)
         cursor.execute(f'UPDATE reminders SET {", ".join(updates)} WHERE id = ?', params)
+        conn.commit()
+        cursor.execute('SELECT * FROM reminders WHERE id = ?', (reminder_id,))
+        res = cursor.fetchone()
+        conn.close()
+        if res:
+            d = dict(res)
+            d['is_completed'] = bool(d['is_completed'])
+            return d
+        return None
+
+    @staticmethod
+    def get_due_reminders() -> List[Dict[str, Any]]:
+        """Găsește toate reminderele nefinalizate a căror scadență a sosit raportat la ora României."""
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        now_str = now_ro_iso()
+        cursor.execute(
+            'SELECT * FROM reminders WHERE is_completed = 0 AND due_date_time <= ? ORDER BY due_date_time ASC',
+            (now_str,)
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        results = []
+        for r in rows:
+            d = dict(r)
+            d['is_completed'] = bool(d['is_completed'])
+            results.append(d)
+        return results
+
+    @staticmethod
+    def snooze_reminder(reminder_id: str, minutes: int = 10) -> Optional[Dict[str, Any]]:
+        """Amână un reminder cu un anumit număr de minute."""
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT due_date_time FROM reminders WHERE id = ?', (reminder_id,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return None
+        
+        now_dt = now_ro()
+        new_due_dt = now_dt + timedelta(minutes=minutes)
+        new_due_str = new_due_dt.isoformat()
+        
+        cursor.execute(
+            'UPDATE reminders SET due_date_time = ?, updated_at = ? WHERE id = ?',
+            (new_due_str, now_ro_iso(), reminder_id)
+        )
         conn.commit()
         cursor.execute('SELECT * FROM reminders WHERE id = ?', (reminder_id,))
         res = cursor.fetchone()
