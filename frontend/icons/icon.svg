@@ -1,0 +1,25 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5" />
+      <stop offset="50%" stop-color="#7c3aed" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+    <linearGradient id="brainGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95" />
+      <stop offset="100%" stop-color="#e0e7ff" stop-opacity="0.8" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#bg)" />
+  <!-- AI Sparkles / Brain Icon -->
+  <g transform="translate(106, 106)" fill="none" stroke="url(#brainGlow)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M150 30 L150 270" />
+    <path d="M30 150 L270 150" />
+    <circle cx="150" cy="150" r="90" fill="#ffffff" fill-opacity="0.1" />
+    <circle cx="150" cy="70" r="18" fill="#ffffff" />
+    <circle cx="230" cy="150" r="18" fill="#ffffff" />
+    <circle cx="150" cy="230" r="18" fill="#ffffff" />
+    <circle cx="70" cy="150" r="18" fill="#ffffff" />
+    <circle cx="150" cy="150" r="28" fill="#38bdf8" />
+  </g>
+</svg>

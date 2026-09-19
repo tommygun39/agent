@@ -1,0 +1,385 @@
+﻿<!DOCTYPE html>
+<html lang="ro" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Momo Agent - Asistent Inteligent Cross-Platform</title>
+  
+  <!-- PWA & Mobile Meta Tags -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Momo Agent">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link rel="icon" type="image/svg+xml" href="/static/icons/icon.svg">
+
+  <!-- Tailwind CSS & Fonts -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Markdown & Syntax Highlighting -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="bg-slate-950 text-slate-100 flex flex-col h-screen select-none antialiased">
+
+  <!-- App Wrapper -->
+  <div class="flex flex-1 overflow-hidden relative">
+
+    <!-- Mobile Drawer Overlay -->
+    <div id="drawerOverlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden md:hidden transition-opacity"></div>
+
+    <!-- SIDEBAR (Desktop Left / Mobile Slide-over) -->
+    <aside id="sidebar" class="fixed md:static inset-y-0 left-0 z-50 w-72 bg-slate-900 border-r border-slate-800 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out select-text">
+      <!-- Sidebar Header -->
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+            <i data-lucide="sparkles" class="w-5 h-5 text-white"></i>
+          </div>
+          <div>
+            <h1 class="font-bold text-base leading-tight tracking-tight text-white flex items-center gap-1.5">
+              Momo Agent
+              <span class="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">AI</span>
+            </h1>
+            <p class="text-xs text-slate-400">Asistent Cross-Platform</p>
+          </div>
+        </div>
+        <button id="closeDrawerBtn" class="md:hidden p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- New Chat Button -->
+      <div class="p-3">
+        <button id="newChatBtn" class="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition shadow-sm shadow-indigo-600/30 active:scale-[0.98]">
+          <i data-lucide="plus" class="w-4 h-4"></i>
+          <span>Conversație nouă</span>
+        </button>
+      </div>
+
+      <!-- Search in conversations -->
+      <div class="px-3 pb-2">
+        <div class="relative">
+          <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute left-3 top-2.5"></i>
+          <input type="text" id="searchChatsInput" placeholder="Caută conversații..." class="w-full bg-slate-950/60 border border-slate-800 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+        </div>
+      </div>
+
+      <!-- Conversation List -->
+      <div class="flex-1 overflow-y-auto px-2 space-y-1" id="conversationsList">
+        <!-- Injected via JS -->
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="p-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+        <button id="openSettingsBtn" class="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition">
+          <i data-lucide="settings" class="w-4 h-4"></i>
+          <span>Setări & API</span>
+        </button>
+        <button id="openMemoriesBtn" class="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800 text-indigo-400 hover:text-indigo-300 transition">
+          <i data-lucide="brain" class="w-4 h-4"></i>
+          <span>Memorie</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="flex-1 flex flex-col min-w-0 bg-slate-950 overflow-hidden relative select-text">
+
+      <!-- Top Navigation Header -->
+      <header class="h-14 border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md flex items-center justify-between px-3 md:px-6 z-20">
+        <div class="flex items-center gap-2 md:gap-4 overflow-hidden">
+          <button id="openDrawerBtn" class="md:hidden p-2 rounded-lg text-slate-300 hover:bg-slate-800">
+            <i data-lucide="menu" class="w-5 h-5"></i>
+          </button>
+          
+          <div class="flex flex-col truncate">
+            <h2 id="currentChatTitle" class="text-sm md:text-base font-semibold text-white truncate max-w-[180px] sm:max-w-xs md:max-w-md">
+              Conversație nouă
+            </h2>
+            <div class="flex items-center gap-2 text-[11px] text-slate-400">
+              <span id="activeMemoriesBadge" class="hidden items-center gap-1 text-emerald-400 cursor-pointer hover:underline">
+                <i data-lucide="brain" class="w-3 h-3"></i>
+                <span id="activeMemoriesCount">0 memorii</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Header Actions -->
+        <div class="flex items-center gap-2">
+          <!-- Model Selector -->
+          <div class="relative">
+            <select id="modelSelect" class="bg-slate-800/90 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer">
+              <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+              <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+              <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+            </select>
+          </div>
+
+          <!-- Tools / Calc button -->
+          <button id="openToolsBtn" title="Calculator & Amanet" class="p-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition">
+            <i data-lucide="calculator" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- Chat Messages Container -->
+      <div id="messagesContainer" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+        <!-- Welcome banner if empty -->
+        <div id="emptyState" class="max-w-lg mx-auto my-auto text-center py-12 px-4">
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-500 to-cyan-400 mx-auto flex items-center justify-center shadow-xl shadow-indigo-500/20 mb-4">
+            <i data-lucide="sparkles" class="w-8 h-8 text-white"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">Salut! Sunt Momo Agent</h3>
+          <p class="text-sm text-slate-400 mb-6">
+            Asistentul tău inteligent dedicat. Pot reține preferințe, să fac calcule de comisioane, să organizez sarcini și să analizez date în timp real.
+          </p>
+
+          <!-- Prompt starters -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
+            <button class="starter-prompt p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-850 text-xs text-slate-300 transition">
+              <div class="font-medium text-white mb-1">🧮 Calculează comision</div>
+              <div class="text-slate-400">Pentru 1.500 lei pe 14 zile cu 0.3% pe zi</div>
+            </button>
+            <button class="starter-prompt p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-850 text-xs text-slate-300 transition">
+              <div class="font-medium text-white mb-1">🧠 Reține o regulă</div>
+              <div class="text-slate-400">Amintește-ți că marțea verificăm stocul</div>
+            </button>
+            <button class="starter-prompt p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-850 text-xs text-slate-300 transition">
+              <div class="font-medium text-white mb-1">📝 Notiță rapidă</div>
+              <div class="text-slate-400">Salvează ideile mele pentru optimizarea agenției</div>
+            </button>
+            <button class="starter-prompt p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-850 text-xs text-slate-300 transition">
+              <div class="font-medium text-white mb-1">💬 Conversație liberă</div>
+              <div class="text-slate-400">Ce putem îmbunătăți la fluxul de lucru?</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Messages stream here -->
+        <div id="messagesList" class="space-y-4 max-w-3xl mx-auto"></div>
+      </div>
+
+      <!-- Input Area (Mobile & PC Optimized) -->
+      <footer class="p-3 md:p-4 bg-slate-900/80 border-t border-slate-800 backdrop-blur-md safe-bottom">
+        <div class="max-w-3xl mx-auto">
+          <form id="chatForm" class="flex items-end gap-2 bg-slate-950 border border-slate-700/80 rounded-2xl p-1.5 focus-within:border-indigo-500 shadow-lg shadow-black/40 transition">
+            
+            <!-- Voice Dictation Button (Web Speech API) -->
+            <button type="button" id="voiceBtn" title="Dictare vocală (Microfon)" class="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition active:scale-95">
+              <i data-lucide="mic" class="w-5 h-5"></i>
+            </button>
+
+            <!-- Dynamic Auto-expanding Textarea -->
+            <textarea id="messageInput" rows="1" placeholder="Scrie un mesaj sau folosește microfonul..." class="flex-1 bg-transparent border-0 resize-none max-h-36 py-2 px-1 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-0"></textarea>
+
+            <!-- Send Button -->
+            <button type="submit" id="sendBtn" class="p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white transition shadow-sm shadow-indigo-600/30 active:scale-95">
+              <i data-lucide="arrow-up" class="w-5 h-5"></i>
+            </button>
+          </form>
+
+          <div class="text-[11px] text-center text-slate-500 mt-2">
+            Momo Agent poate greși. Verifică informațiile importante.
+          </div>
+        </div>
+      </footer>
+
+      <!-- Mobile Bottom Navigation (Only visible on mobile) -->
+      <nav class="md:hidden border-t border-slate-800 bg-slate-900 flex items-center justify-around py-2 safe-bottom">
+        <button id="mobileNavChat" class="flex flex-col items-center gap-0.5 text-indigo-400 text-[10px] font-medium">
+          <i data-lucide="message-square" class="w-5 h-5"></i>
+          <span>Chat</span>
+        </button>
+        <button id="mobileNavMemories" class="flex flex-col items-center gap-0.5 text-slate-400 hover:text-slate-200 text-[10px]">
+          <i data-lucide="brain" class="w-5 h-5"></i>
+          <span>Memorie</span>
+        </button>
+        <button id="mobileNavTools" class="flex flex-col items-center gap-0.5 text-slate-400 hover:text-slate-200 text-[10px]">
+          <i data-lucide="calculator" class="w-5 h-5"></i>
+          <span>Calcule</span>
+        </button>
+        <button id="mobileNavSettings" class="flex flex-col items-center gap-0.5 text-slate-400 hover:text-slate-200 text-[10px]">
+          <i data-lucide="settings" class="w-5 h-5"></i>
+          <span>Setări</span>
+        </button>
+      </nav>
+
+    </main>
+  </div>
+
+  <!-- MODAL: SETTINGS & API -->
+  <div id="settingsModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-150">
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="settings" class="w-5 h-5 text-indigo-400"></i>
+          <h3 class="font-bold text-white text-base">Setări Asistent & API</h3>
+        </div>
+        <button id="closeSettingsModal" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-4 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">Google Gemini API Key</label>
+          <div class="relative">
+            <input type="password" id="geminiKeyInput" placeholder="AIzaSy..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500">
+            <button type="button" id="toggleKeyVisibility" class="absolute right-2.5 top-2.5 text-slate-400 hover:text-white">
+              <i data-lucide="eye" class="w-4 h-4"></i>
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1">
+            Obține o cheie gratuită de pe <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-indigo-400 underline">Google AI Studio</a>.
+          </p>
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">Nume Asistent</label>
+          <input type="text" id="assistantNameInput" value="Momo Agent" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">Instrucțiuni de Sistem (Persona & Comportament)</label>
+          <textarea id="systemPromptInput" rows="4" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"></textarea>
+        </div>
+
+        <div class="pt-2 border-t border-slate-800 flex justify-between items-center text-[11px] text-slate-500">
+          <span>Versiune: 1.0.0</span>
+          <span>Status: <span id="apiKeyStatus" class="text-amber-400 font-medium">Verificare...</span></span>
+        </div>
+      </div>
+
+      <div class="p-4 bg-slate-950 border-t border-slate-800 flex justify-end gap-2">
+        <button id="cancelSettingsBtn" class="px-4 py-2 rounded-xl text-slate-300 hover:bg-slate-800">Anulează</button>
+        <button id="saveSettingsBtn" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium">Salvează setările</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: LONG-TERM MEMORIES -->
+  <div id="memoriesModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="brain" class="w-5 h-5 text-indigo-400"></i>
+          <div>
+            <h3 class="font-bold text-white text-base">Memorie Persistentă</h3>
+            <p class="text-xs text-slate-400">Fapte, preferințe și instrucțiuni reținute</p>
+          </div>
+        </div>
+        <button id="closeMemoriesModal" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Add Memory Form -->
+      <div class="p-3 bg-slate-950 border-b border-slate-800 flex gap-2">
+        <select id="newMemoryCategory" class="bg-slate-800 border border-slate-700 rounded-lg text-xs px-2 py-1 text-slate-200">
+          <option value="preference">Preferință</option>
+          <option value="fact">Fapt / Detaliu</option>
+          <option value="instruction">Instrucțiune</option>
+          <option value="project">Proiect</option>
+        </select>
+        <input type="text" id="newMemoryContent" placeholder="Ex: Utilizatorul preferă răspunsuri scurte..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:border-indigo-500">
+        <button id="addMemoryBtn" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-1 rounded-lg font-medium">Adaugă</button>
+      </div>
+
+      <!-- Search in memory -->
+      <div class="p-3 border-b border-slate-800">
+        <input type="text" id="searchMemoryInput" placeholder="Caută semantic în memorie..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200">
+      </div>
+
+      <!-- Memories List -->
+      <div id="memoriesList" class="flex-1 overflow-y-auto p-4 space-y-2">
+        <!-- Loaded via JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CALCULATOR & TOOLS -->
+  <div id="toolsModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="calculator" class="w-5 h-5 text-indigo-400"></i>
+          <h3 class="font-bold text-white text-base">Calculator Comision Amanet</h3>
+        </div>
+        <button id="closeToolsModal" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-4 space-y-3 text-xs">
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">Sumă Împrumut (LEI)</label>
+          <input type="number" id="calcPrincipal" value="1000" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white">
+        </div>
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">Număr Zile</label>
+          <input type="number" id="calcDays" value="10" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white">
+        </div>
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">Comision Zilnic (%)</label>
+          <input type="number" step="0.05" id="calcRate" value="0.3" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white">
+        </div>
+
+        <button id="runCalcBtn" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs transition mt-2">
+          Calculează Comision
+        </button>
+
+        <div id="calcResult" class="hidden p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 text-slate-300">
+          <div class="flex justify-between"><span>Comision total:</span> <strong id="resCommission" class="text-amber-400">0 LEI</strong></div>
+          <div class="flex justify-between"><span>Total de rambursat:</span> <strong id="resTotal" class="text-emerald-400">0 LEI</strong></div>
+          <div class="text-[10px] text-slate-500 mt-1">* Se aplică minim 5 zile și comision minim 10 LEI.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Memories Popover / Preview -->
+  <div id="memoriesPreviewModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-4 space-y-3">
+      <div class="flex items-center justify-between">
+        <h4 class="font-bold text-white text-sm flex items-center gap-1.5">
+          <i data-lucide="brain" class="w-4 h-4 text-emerald-400"></i>
+          Memorii folosite în acest răspuns
+        </h4>
+        <button id="closePreviewBtn" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div id="previewMemoriesContent" class="text-xs space-y-2 text-slate-300 max-h-60 overflow-y-auto"></div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
