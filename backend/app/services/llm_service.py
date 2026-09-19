@@ -1,5 +1,6 @@
 import json
 import uuid
+import asyncio
 from datetime import datetime
 from typing import AsyncGenerator, List, Dict, Any, Optional
 import google.generativeai as genai
@@ -144,12 +145,15 @@ class LLMService:
             )
             
             chat = model.start_chat(history=chat_contents, enable_automatic_function_calling=True)
-            response = chat.send_message(message, stream=True)
+            response = chat.send_message(message)
             
-            for chunk in response:
-                if chunk.text:
-                    full_assistant_reply += chunk.text
-                    yield f"data: {json.dumps({'type': 'chunk', 'content': chunk.text})}\n\n"
+            if response and response.text:
+                full_assistant_reply = response.text
+                words = full_assistant_reply.split(" ")
+                for i, word in enumerate(words):
+                    suffix = " " if i < len(words) - 1 else ""
+                    yield f"data: {json.dumps({'type': 'chunk', 'content': word + suffix})}\n\n"
+                    await asyncio.sleep(0.015)
 
         except Exception as e:
             err_msg = f"A apărut o eroare la apelarea modelului AI ({model_to_use}): {str(e)}"
