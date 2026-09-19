@@ -10,13 +10,14 @@ router = APIRouter()
 
 @router.post('/chat/stream')
 async def chat_stream(request: ChatRequest, x_gemini_key: Optional[str] = Header(None)):
-    if x_gemini_key and not settings.GEMINI_API_KEY:
+    if x_gemini_key and (not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY != x_gemini_key):
         settings.update_gemini_key(x_gemini_key)
     return StreamingResponse(
         LLMService.stream_chat(
             message=request.message,
             conversation_id=request.conversation_id,
-            model_name=request.model
+            model_name=request.model,
+            api_key_override=x_gemini_key
         ),
         media_type='text/event-stream'
     )

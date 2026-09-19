@@ -516,7 +516,7 @@ async function loadSettings() {
     const data = await res.json();
     assistantNameInput.value = data.assistant_name || "Pandele";
     systemPromptInput.value = data.system_prompt || "";
-    modelSelect.value = data.default_model || "gemini-3.6-flash";
+    modelSelect.value = data.default_model || "gemini-flash-latest";
 
     // Auto-heal API key from localStorage if backend doesn't have it
     const localKey = localStorage.getItem("pandele_gemini_key") || "";

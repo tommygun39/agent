@@ -12,7 +12,7 @@ services:
       - key: ASSISTANT_NAME
         value: Pandele
       - key: DEFAULT_MODEL
-        value: gemini-3.6-flash
+        value: gemini-flash-latest
       - key: TZ
         value: Europe/Bucharest
       - key: GEMINI_API_KEY

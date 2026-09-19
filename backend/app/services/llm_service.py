@@ -41,6 +41,14 @@ def tool_calculate_pawn(principal_lei: float, days: int, daily_rate_percent: flo
     res = ToolsService.calculate_pawn_commission(principal_lei, days, daily_rate_percent)
     return json.dumps(res)
 
+FALLBACK_MODELS = [
+    'gemini-flash-latest',
+    'gemini-flash-lite-latest',
+    'gemini-3.5-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-3.6-flash'
+]
+
 AVAILABLE_TOOLS = [tool_create_reminder, tool_list_reminders, tool_calculate_pawn]
 
 class LLMService:
@@ -65,7 +73,8 @@ class LLMService:
     async def stream_chat(
         message: str,
         conversation_id: Optional[str] = None,
-        model_name: Optional[str] = None
+        model_name: Optional[str] = None,
+        api_key_override: Optional[str] = None
     ) -> AsyncGenerator[str, None]:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -102,7 +111,7 @@ class LLMService:
         raw_history = cursor.fetchall()
         conn.close()
 
-        api_key = settings.get_gemini_key()
+        api_key = api_key_override or settings.get_gemini_key()
         if not api_key:
             info_msg = (
                 "Salut! 👋 Sunt **Pandele**, asistentul tău personal.\n\n"
@@ -125,7 +134,9 @@ class LLMService:
             yield f"data: {json.dumps({'type': 'done', 'conversation_id': conversation_id})}\n\n"
             return
 
-        model_to_use = model_name or settings.DEFAULT_MODEL
+        initial_model = model_name or settings.DEFAULT_MODEL
+        candidates = [initial_model] + [m for m in FALLBACK_MODELS if m != initial_model]
+
         genai.configure(api_key=api_key)
         
         system_instruction = LLMService.get_system_prompt()
@@ -139,26 +150,46 @@ class LLMService:
             chat_contents.append({'role': role, 'parts': [row['content']]})
             
         full_assistant_reply = ""
-        try:
-            model = genai.GenerativeModel(
-                model_name=model_to_use,
-                system_instruction=system_instruction,
-                tools=AVAILABLE_TOOLS
-            )
-            
-            chat = model.start_chat(history=chat_contents, enable_automatic_function_calling=True)
-            response = chat.send_message(message)
-            
-            if response and response.text:
-                full_assistant_reply = response.text
-                words = full_assistant_reply.split(" ")
-                for i, word in enumerate(words):
-                    suffix = " " if i < len(words) - 1 else ""
-                    yield f"data: {json.dumps({'type': 'chunk', 'content': word + suffix})}\n\n"
-                    await asyncio.sleep(0.015)
+        success = False
+        last_error = ""
 
-        except Exception as e:
-            err_msg = f"A apărut o eroare la apelarea modelului AI ({model_to_use}): {str(e)}"
+        for current_model in candidates:
+            try:
+                model = genai.GenerativeModel(
+                    model_name=current_model,
+                    system_instruction=system_instruction,
+                    tools=AVAILABLE_TOOLS
+                )
+                
+                chat = model.start_chat(history=chat_contents, enable_automatic_function_calling=True)
+                response = chat.send_message(message)
+                
+                reply_text = ""
+                try:
+                    if response and response.text:
+                        reply_text = response.text
+                except Exception:
+                    if hasattr(response, 'candidates') and response.candidates:
+                        parts = response.candidates[0].content.parts
+                        reply_text = " ".join([p.text for p in parts if hasattr(p, 'text') and p.text])
+                
+                if reply_text:
+                    full_assistant_reply = reply_text
+                    words = full_assistant_reply.split(" ")
+                    for i, word in enumerate(words):
+                        suffix = " " if i < len(words) - 1 else ""
+                        yield f"data: {json.dumps({'type': 'chunk', 'content': word + suffix})}\n\n"
+                        await asyncio.sleep(0.015)
+                    success = True
+                    break
+            except Exception as e:
+                err_str = str(e)
+                last_error = err_str
+                print(f"[LLMService] Model {current_model} call failed ({err_str[:120]}). Trying next candidate...")
+                continue
+
+        if not success:
+            err_msg = f"A apărut o eroare la apelarea modelelor AI (ultimul model încercat: {candidates[-1]}): {last_error}"
             full_assistant_reply = err_msg
             yield f"data: {json.dumps({'type': 'error', 'content': err_msg})}\n\n"
 

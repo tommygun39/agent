@@ -21,8 +21,10 @@ def get_settings():
         'current_ro_time': ToolsService.get_current_time()['formatted'],
         'system_prompt': settings.DEFAULT_SYSTEM_PROMPT,
         'available_models': [
-            {'id': 'gemini-3.6-flash', 'name': 'Gemini 3.6 Flash (Recomandat, Cel mai nou)'},
-            {'id': 'gemini-2.0-flash', 'name': 'Gemini 2.0 Flash'},
+            {'id': 'gemini-flash-latest', 'name': 'Gemini Flash (Stabil, Cotă mare - Recomandat)'},
+            {'id': 'gemini-flash-lite-latest', 'name': 'Gemini Flash Lite (Ultra-Rapid)'},
+            {'id': 'gemini-3.5-flash', 'name': 'Gemini 3.5 Flash'},
+            {'id': 'gemini-3.6-flash', 'name': 'Gemini 3.6 Flash (Preview - Limitat 20 req/zi)'},
         ]
     }
 
