@@ -1,5 +1,7 @@
 # 🌟 Pandele - Asistent Personal Inteligent Cross-Platform
 
+👉 **Aplicație Live Online (24/7): [https://agent-5sfa.onrender.com/](https://agent-5sfa.onrender.com/)**
+
 Asistentul tău personal inteligent, proiectat pentru funcționare cross-platform impecabilă pe **PC și Telefon**, dotat cu **memorie persistentă pe termen lung (semantic memory)**, remindere inteligente prin **Function Calling**, calcule specializate și suport pentru modelele **Google Gemini (2.0 Flash / 1.5 Pro)**. Răspunde prompt și dedicat la numele de **Pandele**.
 
 ---
