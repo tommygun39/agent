@@ -38,9 +38,39 @@ class Settings:
     HOST: str = os.getenv('HOST', '0.0.0.0')
     PORT: int = int(os.getenv('PORT', '8000'))
 
+    def get_gemini_key(self) -> str:
+        if self.GEMINI_API_KEY:
+            return self.GEMINI_API_KEY
+        try:
+            from backend.app.core.database import get_db_connection
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
+            cursor.execute("SELECT value FROM settings WHERE key = 'GEMINI_API_KEY'")
+            row = cursor.fetchone()
+            conn.close()
+            if row and row['value']:
+                self.GEMINI_API_KEY = row['value'].strip()
+                return self.GEMINI_API_KEY
+        except Exception:
+            pass
+        return ''
+
     def update_gemini_key(self, new_key: str):
         self.GEMINI_API_KEY = new_key.strip()
-        # Optionally write back to .env
+        # Save to SQLite database settings table
+        try:
+            from backend.app.core.database import get_db_connection
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
+            cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('GEMINI_API_KEY', ?)", (self.GEMINI_API_KEY,))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f'Error saving key to db: {e}')
+            
+        # Write back to .env
         try:
             lines = []
             if ENV_PATH.exists():

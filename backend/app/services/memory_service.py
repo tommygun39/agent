@@ -1,4 +1,4 @@
-﻿import json
+import json
 import uuid
 from datetime import datetime
 from typing import List, Dict, Any, Optional
@@ -10,9 +10,10 @@ class MemoryService:
     @staticmethod
     def get_embedding(text: str) -> List[float]:
         """Generate embedding using Gemini API or fallback vector"""
-        if settings.GEMINI_API_KEY:
+        api_key = settings.get_gemini_key()
+        if api_key:
             try:
-                genai.configure(api_key=settings.GEMINI_API_KEY)
+                genai.configure(api_key=api_key)
                 result = genai.embed_content(
                     model="models/text-embedding-004",
                     content=text,

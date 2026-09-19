@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter
+from fastapi import APIRouter
 from backend.app.models.schema import SettingsUpdate, NoteCreate
 from backend.app.core.config import settings
 from backend.app.services.tools_service import ToolsService
@@ -7,10 +7,11 @@ router = APIRouter()
 
 @router.get('/settings')
 def get_settings():
-    has_key = bool(settings.GEMINI_API_KEY)
+    key = settings.get_gemini_key()
+    has_key = bool(key)
     masked_key = ''
     if has_key:
-        masked_key = settings.GEMINI_API_KEY[:4] + '...' + settings.GEMINI_API_KEY[-4:] if len(settings.GEMINI_API_KEY) > 8 else '***'
+        masked_key = key[:4] + '...' + key[-4:] if len(key) > 8 else '***'
     return {
         'assistant_name': settings.ASSISTANT_NAME,
         'default_model': settings.DEFAULT_MODEL,

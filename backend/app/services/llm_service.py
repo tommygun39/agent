@@ -100,7 +100,7 @@ class LLMService:
         raw_history = cursor.fetchall()
         conn.close()
 
-        api_key = settings.GEMINI_API_KEY
+        api_key = settings.get_gemini_key()
         if not api_key:
             info_msg = (
                 "Salut! 👋 Sunt **Pandele**, asistentul tău personal.\n\n"
