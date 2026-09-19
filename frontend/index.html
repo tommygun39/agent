@@ -134,6 +134,10 @@
               Conversație nouă
             </h2>
             <div class="flex items-center gap-2 text-[11px] text-slate-400">
+              <span id="roClockBadge" class="inline-flex items-center gap-1 text-sky-400 font-medium px-2 py-0.5 rounded-full bg-sky-950/60 border border-sky-800/40" title="Fus orar oficial: Ora României (Europe/Bucharest)">
+                <i data-lucide="clock" class="w-3 h-3 text-sky-400"></i>
+                <span id="roClockText">🇷🇴 RO: --:--:--</span>
+              </span>
               <span id="activeMemoriesBadge" class="hidden items-center gap-1 text-emerald-400 cursor-pointer hover:underline">
                 <i data-lucide="brain" class="w-3 h-3"></i>
                 <span id="activeMemoriesCount">0 memorii</span>
@@ -403,9 +407,25 @@
           <textarea id="systemPromptInput" rows="4" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500"></textarea>
         </div>
 
-        <div class="pt-2 border-t border-slate-800 flex justify-between items-center text-[11px] text-slate-500">
-          <span>Versiune: 1.1.0</span>
-          <span>Status: <span id="apiKeyStatus" class="text-amber-400 font-medium">Verificare...</span></span>
+        <div class="pt-2 border-t border-slate-800 space-y-1 text-[11px] text-slate-400">
+          <div class="flex justify-between items-center">
+            <span>Fus Orar Oficial:</span>
+            <span class="text-sky-400 font-medium flex items-center gap-1">
+              <i data-lucide="globe" class="w-3 h-3"></i> Europe/Bucharest (Ora României)
+            </span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span>Ora României (Server):</span>
+            <span id="settingsRoTime" class="text-white font-mono font-medium">--:--:--</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span>Status Cheie API:</span>
+            <span id="apiKeyStatus" class="text-amber-400 font-medium">Verificare...</span>
+          </div>
+          <div class="flex justify-between items-center text-slate-500">
+            <span>Versiune Asistent:</span>
+            <span>v1.2.1</span>
+          </div>
         </div>
       </div>
 

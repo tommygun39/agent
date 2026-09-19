@@ -13,5 +13,7 @@ services:
         value: Pandele
       - key: DEFAULT_MODEL
         value: gemini-3.6-flash
+      - key: TZ
+        value: Europe/Bucharest
       - key: GEMINI_API_KEY
         sync: false

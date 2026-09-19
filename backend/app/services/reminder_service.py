@@ -1,7 +1,7 @@
-﻿import uuid
-from datetime import datetime, date
+import uuid
 from typing import List, Dict, Any, Optional
 from backend.app.core.database import get_db_connection
+from backend.app.core.timezone import now_ro_iso, today_ro_str
 
 class ReminderService:
     @staticmethod
@@ -16,7 +16,7 @@ class ReminderService:
         cursor = conn.cursor()
         
         rem_id = str(uuid.uuid4())
-        now = datetime.now().isoformat()
+        now = now_ro_iso()
         
         # Clean due_date_time
         clean_due = due_date_time.strip()
@@ -47,7 +47,7 @@ class ReminderService:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        today_str = date.today().isoformat()
+        today_str = today_ro_str()
         
         if filter_type == 'today':
             cursor.execute(
@@ -88,7 +88,7 @@ class ReminderService:
             return None
             
         new_status = 0 if row['is_completed'] else 1
-        now = datetime.now().isoformat()
+        now = now_ro_iso()
         cursor.execute(
             'UPDATE reminders SET is_completed = ?, updated_at = ? WHERE id = ?',
             (new_status, now, reminder_id)
@@ -124,7 +124,7 @@ class ReminderService:
         if not updates:
             conn.close()
             return None
-        now = datetime.now().isoformat()
+        now = now_ro_iso()
         updates.append('updated_at = ?')
         params.append(now)
         params.append(reminder_id)

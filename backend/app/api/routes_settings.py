@@ -17,6 +17,8 @@ def get_settings():
         'default_model': settings.DEFAULT_MODEL,
         'has_api_key': has_key,
         'masked_api_key': masked_key,
+        'timezone': 'Europe/Bucharest',
+        'current_ro_time': ToolsService.get_current_time()['formatted'],
         'system_prompt': settings.DEFAULT_SYSTEM_PROMPT,
         'available_models': [
             {'id': 'gemini-3.6-flash', 'name': 'Gemini 3.6 Flash (Recomandat, Cel mai nou)'},

@@ -6,6 +6,7 @@ from typing import AsyncGenerator, List, Dict, Any, Optional
 import google.generativeai as genai
 from backend.app.core.config import settings
 from backend.app.core.database import get_db_connection
+from backend.app.core.timezone import now_ro_iso, format_ro_full
 from backend.app.services.memory_service import MemoryService
 from backend.app.services.tools_service import ToolsService
 from backend.app.services.reminder_service import ReminderService
@@ -45,17 +46,18 @@ AVAILABLE_TOOLS = [tool_create_reminder, tool_list_reminders, tool_calculate_paw
 class LLMService:
     @staticmethod
     def get_system_prompt(custom_instructions: Optional[str] = None) -> str:
-        current_time = ToolsService.get_current_time()['formatted']
-        iso_now = datetime.now().isoformat()
+        current_time = format_ro_full()
+        iso_now = now_ro_iso()
         base = settings.DEFAULT_SYSTEM_PROMPT
         if custom_instructions:
             base += f"\n\nInstrucțiuni personalizate permanente:\n{custom_instructions}"
         base += (
             f"\n\nContext Temporal & Spațial:\n"
-            f"- Data și ora curentă: {current_time} (București, România).\n"
-            f"- Timestamp ISO curent: {iso_now}.\n"
+            f"- Fus orar oficial: Ora României (Europe/Bucharest, EEST/EET).\n"
+            f"- Data și ora curentă exactă: {current_time}.\n"
+            f"- Timestamp ISO curent (cu fus orar): {iso_now}.\n"
             f"- Când utilizatorul menționează termene relative (ex: 'mâine', 'luni', 'peste 2 ore', 'la ora 15'), "
-            f"calculează data și ora exactă raportat la data și ora curentă de mai sus și apelează unealta corespunzătoare."
+            f"calculează data și ora exactă raportat la data și ora curentă a României de mai sus și apelează unealta corespunzătoare."
         )
         return base
 
@@ -68,7 +70,7 @@ class LLMService:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        now = datetime.now().isoformat()
+        now = now_ro_iso()
         if not conversation_id:
             conversation_id = str(uuid.uuid4())
             title = message.strip().split('\n')[0][:40] or 'Conversație nouă'
@@ -116,7 +118,7 @@ class LLMService:
             cursor = conn.cursor()
             cursor.execute(
                 'INSERT INTO messages (id, conversation_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-                (str(uuid.uuid4()), conversation_id, 'assistant', info_msg, '{}', datetime.now().isoformat())
+                (str(uuid.uuid4()), conversation_id, 'assistant', info_msg, '{}', now_ro_iso())
             )
             conn.commit()
             conn.close()
@@ -165,7 +167,7 @@ class LLMService:
         cursor = conn.cursor()
         cursor.execute(
             'INSERT INTO messages (id, conversation_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-            (str(uuid.uuid4()), conversation_id, 'assistant', full_assistant_reply, '{}', datetime.now().isoformat())
+            (str(uuid.uuid4()), conversation_id, 'assistant', full_assistant_reply, '{}', now_ro_iso())
         )
         conn.commit()
         conn.close()

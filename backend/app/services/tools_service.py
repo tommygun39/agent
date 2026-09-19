@@ -1,22 +1,15 @@
-﻿import math
+import math
 from datetime import datetime
 import json
 import uuid
 from typing import Dict, Any, List
 from backend.app.core.database import get_db_connection
+from backend.app.core.timezone import get_time_context, now_ro_iso
 
 class ToolsService:
     @staticmethod
     def get_current_time(timezone: str = 'Europe/Bucharest') -> Dict[str, Any]:
-        now = datetime.now()
-        days_ro = ['Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri', 'Sâmbătă', 'Duminică']
-        day_name = days_ro[now.weekday()]
-        time_str = now.strftime("%d.%m.%Y %H:%M:%S")
-        return {
-            'timestamp': now.isoformat(),
-            'formatted': f'{day_name}, {time_str}',
-            'timezone': timezone
-        }
+        return get_time_context()
 
     @staticmethod
     def calculate_expression(expression: str) -> Dict[str, Any]:
@@ -54,7 +47,7 @@ class ToolsService:
         conn = get_db_connection()
         cursor = conn.cursor()
         note_id = str(uuid.uuid4())
-        now = datetime.now().isoformat()
+        now = now_ro_iso()
         cursor.execute(
             'INSERT INTO notes (id, title, content, tags, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
             (note_id, title, content, tags, now, now)

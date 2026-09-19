@@ -1,10 +1,10 @@
 import json
 import uuid
-from datetime import datetime
 from typing import List, Dict, Any, Optional
 import google.generativeai as genai
 from backend.app.core.config import settings
 from backend.app.core.database import get_db_connection, cosine_similarity
+from backend.app.core.timezone import now_ro_iso
 
 class MemoryService:
     @staticmethod
@@ -15,7 +15,7 @@ class MemoryService:
             try:
                 genai.configure(api_key=api_key)
                 result = genai.embed_content(
-                    model="models/text-embedding-004",
+                    model="models/gemini-embedding-001",
                     content=text,
                     task_type="semantic_similarity"
                 )
@@ -39,7 +39,7 @@ class MemoryService:
         cursor = conn.cursor()
         
         mem_id = str(uuid.uuid4())
-        now = datetime.now().isoformat()
+        now = now_ro_iso()
         embedding = MemoryService.get_embedding(content)
         
         cursor.execute(
@@ -92,7 +92,7 @@ class MemoryService:
         
         # Update last_accessed_at for retrieved memories
         if results:
-            now = datetime.now().isoformat()
+            now = now_ro_iso()
             ids = [r["id"] for r in results]
             cursor.execute(
                 f"UPDATE memories SET last_accessed_at = ? WHERE id IN ({','.join(['?']*len(ids))})",

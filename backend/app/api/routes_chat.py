@@ -1,13 +1,17 @@
-﻿from fastapi import APIRouter, HTTPException
+from typing import Optional
+from fastapi import APIRouter, HTTPException, Header
 from fastapi.responses import StreamingResponse
 from backend.app.models.schema import ChatRequest
 from backend.app.services.llm_service import LLMService
+from backend.app.core.config import settings
 from backend.app.core.database import get_db_connection
 
 router = APIRouter()
 
 @router.post('/chat/stream')
-async def chat_stream(request: ChatRequest):
+async def chat_stream(request: ChatRequest, x_gemini_key: Optional[str] = Header(None)):
+    if x_gemini_key and not settings.GEMINI_API_KEY:
+        settings.update_gemini_key(x_gemini_key)
     return StreamingResponse(
         LLMService.stream_chat(
             message=request.message,

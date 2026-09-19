@@ -1,9 +1,9 @@
-﻿from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException
 from typing import List
 import uuid
-from datetime import datetime
 from backend.app.models.schema import ConversationSchema, ConversationCreate
 from backend.app.core.database import get_db_connection
+from backend.app.core.timezone import now_ro_iso
 
 router = APIRouter()
 
@@ -21,7 +21,7 @@ def create_conversation(data: ConversationCreate):
     conn = get_db_connection()
     cursor = conn.cursor()
     conv_id = str(uuid.uuid4())
-    now = datetime.now().isoformat()
+    now = now_ro_iso()
     title = data.title or 'Conversație nouă'
     cursor.execute(
         'INSERT INTO conversations (id, title, is_pinned, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
@@ -59,7 +59,7 @@ def update_conversation(conv_id: str, payload: dict):
         return {'success': False}
         
     updates.append('updated_at = ?')
-    params.append(datetime.now().isoformat())
+    params.append(now_ro_iso())
     params.append(conv_id)
     
     query = f"UPDATE conversations SET {', '.join(updates)} WHERE id = ?"

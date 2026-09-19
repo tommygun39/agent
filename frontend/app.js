@@ -70,8 +70,26 @@ const newMemoryCategory = document.getElementById("newMemoryCategory");
 const newMemoryContent = document.getElementById("newMemoryContent");
 const addMemoryBtn = document.getElementById("addMemoryBtn");
 
+function updateRomanianClock() {
+  try {
+    const el = document.getElementById("roClockText");
+    if (!el) return;
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat("ro-RO", {
+      timeZone: "Europe/Bucharest",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    });
+    el.innerText = `🇷🇴 RO: ${formatter.format(now)}`;
+  } catch (e) {}
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   lucide.createIcons();
+  updateRomanianClock();
+  setInterval(updateRomanianClock, 1000);
   loadSettings();
   loadConversations();
   if (typeof initReminders === "function") initReminders();
@@ -343,9 +361,15 @@ async function sendMessage() {
   let accumulatedResponse = "";
 
   try {
+    const storedKey = localStorage.getItem("pandele_gemini_key") || "";
+    const reqHeaders = { "Content-Type": "application/json" };
+    if (storedKey) {
+      reqHeaders["X-Gemini-Key"] = storedKey;
+    }
+
     const response = await fetch("/api/chat/stream", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: reqHeaders,
       body: JSON.stringify({
         message: text,
         conversation_id: currentConversationId,
@@ -493,12 +517,29 @@ async function loadSettings() {
     assistantNameInput.value = data.assistant_name || "Pandele";
     systemPromptInput.value = data.system_prompt || "";
     modelSelect.value = data.default_model || "gemini-3.6-flash";
+
+    // Auto-heal API key from localStorage if backend doesn't have it
+    const localKey = localStorage.getItem("pandele_gemini_key") || "";
+    if (!data.has_api_key && localKey) {
+      await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gemini_api_key: localKey })
+      });
+      return loadSettings();
+    }
+
     if (data.has_api_key) {
       apiKeyStatus.innerText = "Configurat ✓ (" + data.masked_api_key + ")";
       apiKeyStatus.className = "text-emerald-400 font-medium";
     } else {
       apiKeyStatus.innerText = "Lipsă API Key ⚠️";
       apiKeyStatus.className = "text-amber-400 font-medium";
+    }
+
+    const settingsRoTime = document.getElementById("settingsRoTime");
+    if (settingsRoTime && data.current_ro_time) {
+      settingsRoTime.innerText = data.current_ro_time;
     }
   } catch (err) {}
 }
@@ -509,13 +550,18 @@ async function saveSettings() {
     system_prompt: systemPromptInput.value.trim(),
     default_model: modelSelect.value
   };
-  if (geminiKeyInput.value.trim()) payload.gemini_api_key = geminiKeyInput.value.trim();
+  const keyVal = geminiKeyInput.value.trim();
+  if (keyVal) {
+    payload.gemini_api_key = keyVal;
+    localStorage.setItem("pandele_gemini_key", keyVal);
+  }
   try {
     await fetch("/api/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
+    geminiKeyInput.value = "";
     settingsModal.classList.add("hidden");
     loadSettings();
   } catch (err) {
