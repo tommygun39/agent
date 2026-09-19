@@ -1,4 +1,4 @@
-﻿import json
+import json
 import uuid
 from datetime import datetime
 from typing import AsyncGenerator, List, Dict, Any, Optional
@@ -102,7 +102,7 @@ class LLMService:
         api_key = settings.GEMINI_API_KEY
         if not api_key:
             info_msg = (
-                "Salut! 👋 Sunt **Momo Agent**.\n\n"
+                "Salut! 👋 Sunt **Pandele**, asistentul tău personal.\n\n"
                 "Pentru a putea purta conversații inteligente, a crea remindere și a folosi uneltele, "
                 "te rog să adaugi cheia ta **Google Gemini API** în panoul de **Setări (⚙️)** din colțul ecranului "
                 "sau în fișierul `.env`.\n\n"

@@ -1,4 +1,4 @@
-﻿// Core Application Script for Momo Agent
+// Core Application Script for Momo Agent
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js")
@@ -490,7 +490,7 @@ async function loadSettings() {
   try {
     const res = await fetch("/api/settings");
     const data = await res.json();
-    assistantNameInput.value = data.assistant_name || "Momo Agent";
+    assistantNameInput.value = data.assistant_name || "Pandele";
     systemPromptInput.value = data.system_prompt || "";
     modelSelect.value = data.default_model || "gemini-2.0-flash";
     if (data.has_api_key) {

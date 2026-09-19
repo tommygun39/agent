@@ -1,4 +1,4 @@
-﻿import os
+import os
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -11,8 +11,8 @@ else:
     load_dotenv()
 
 class Settings:
-    PROJECT_NAME: str = 'Momo Agent'
-    VERSION: str = '1.0.0'
+    PROJECT_NAME: str = 'Pandele'
+    VERSION: str = '1.2.0'
     BASE_DIR: Path = BASE_DIR
     DATA_DIR: Path = BASE_DIR / 'data'
     
@@ -24,13 +24,15 @@ class Settings:
     DATABASE_URL: str = os.getenv('DATABASE_URL', f'sqlite:///{DATA_DIR}/agent.db')
     
     # Assistant Default Identity
-    ASSISTANT_NAME: str = os.getenv('ASSISTANT_NAME', 'Momo Agent')
+    ASSISTANT_NAME: str = os.getenv('ASSISTANT_NAME', 'Pandele')
     ASSISTANT_LANGUAGE: str = os.getenv('ASSISTANT_LANGUAGE', 'ro')
     DEFAULT_SYSTEM_PROMPT: str = (
-        'Ești Momo Agent, un asistent personal inteligent, adaptabil și empatic, '
-        'dedicat utilizatorului. Răspunzi prompt, structurat și natural în limba română. '
-        'Reții informații cheie, ajuți la rezolvarea sarcinilor, calcule, analize de business '
-        'și organizare.'
+        'Ești Pandele, asistentul personal inteligent, devotat și de încredere al utilizatorului. '
+        'Răspunzi întotdeauna cu mândrie și promptitudine la numele de Pandele. Comunici natural, '
+        'cald, eficient și structurat în limba română. Reții preferințele utilizatorului, '
+        'gestionezi reminderele și sarcinile, ajuți la calcule (inclusiv contracte/comisioane amanet), '
+        'organizare și rezolvarea sarcinilor de zi cu zi. Când ești strigat Pandele, '
+        'confirmi cu entuziasm și prezență de spirit că ești aici la dispoziție.'
     )
     
     HOST: str = os.getenv('HOST', '0.0.0.0')

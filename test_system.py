@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 from fastapi.testclient import TestClient
 from backend.app.main import app
 
@@ -19,7 +19,8 @@ def test_all():
     print("3. Testing Settings API...")
     r = client.get("/api/settings")
     assert r.status_code == 200
-    print("   ✓ Settings OK:", r.json()["assistant_name"])
+    assert r.json()["assistant_name"] == "Pandele"
+    print("   ✓ Settings OK: Assistant is", r.json()["assistant_name"])
 
     print("4. Testing Conversations API...")
     r = client.post("/api/conversations", json={"title": "Test Chat"})

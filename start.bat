@@ -1,9 +1,9 @@
-﻿@echo off
+@echo off
 chcp 65001 >nul
-title Momo Agent - Asistent Inteligent Cross-Platform
+title Pandele - Asistent Personal Inteligent
 
 echo ===================================================
-echo           MOMO AGENT - ASISTENT PERSONAL
+echo              PANDELE - ASISTENT PERSONAL
 echo ===================================================
 echo.
 
