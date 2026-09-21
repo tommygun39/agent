@@ -210,14 +210,14 @@ function playLoudAlarmTone() {
     if (ctx.state === "suspended") {
       ctx.resume().catch(() => {});
     }
-    const now = ctx.currentTime;
+    const now = ctx.currentTime + 0.05;
 
     // 4 powerful, bright bell harmonics: A5 (880Hz), C#6 (1108Hz), E6 (1318Hz), A6 (1760Hz)
     const tones = [
-      { freq: 880.00, start: 0.0, dur: 0.25, gain: 0.8 },
-      { freq: 1108.73, start: 0.12, dur: 0.25, gain: 0.85 },
-      { freq: 1318.51, start: 0.24, dur: 0.4, gain: 0.9 },
-      { freq: 1760.00, start: 0.38, dur: 0.8, gain: 0.95 }
+      { freq: 880.00, start: 0.0, dur: 0.28, gain: 0.9 },
+      { freq: 1108.73, start: 0.12, dur: 0.28, gain: 0.9 },
+      { freq: 1318.51, start: 0.24, dur: 0.38, gain: 0.95 },
+      { freq: 1760.00, start: 0.38, dur: 0.75, gain: 1.0 }
     ];
 
     tones.forEach(t => {
@@ -226,9 +226,9 @@ function playLoudAlarmTone() {
       osc.type = "sine";
       osc.frequency.setValueAtTime(t.freq, now + t.start);
 
-      gainNode.gain.setValueAtTime(0.001, now + t.start);
-      gainNode.gain.exponentialRampToValueAtTime(t.gain, now + t.start + 0.02);
-      gainNode.gain.exponentialRampToValueAtTime(0.0001, now + t.start + t.dur);
+      gainNode.gain.setValueAtTime(0.01, now + t.start);
+      gainNode.gain.linearRampToValueAtTime(t.gain, now + t.start + 0.025);
+      gainNode.gain.linearRampToValueAtTime(0.001, now + t.start + t.dur);
 
       osc.connect(gainNode);
       gainNode.connect(ctx.destination);
@@ -424,51 +424,93 @@ async function requestNotificationPermission(userTriggered = false) {
   return Notification.permission;
 }
 
-function initAudioBanner() {
-  const isTested = localStorage.getItem("pandele_audio_tested") === "true";
-  if (isTested && Notification.permission === "granted") {
-    if (audioUnlockBanner) audioUnlockBanner.style.display = "none";
+async function testAndEnableAudio() {
+  const btn = document.getElementById("testAndEnableAudioBtn");
+  if (btn) {
+    btn.innerHTML = `<span class="flex items-center gap-1.5"><i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Testare în curs...</span></span>`;
+    if (window.lucide) lucide.createIcons();
   }
 
-  testAndEnableAudioBtn?.addEventListener("click", async () => {
-    unlockAudioGlobal();
-    // 1. Play loud chime right now!
-    playLoudAlarmTone();
-    setTimeout(playLoudAlarmTone, 700);
+  // 1. Force unlock Web Audio Context & Play loud chime
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === "suspended") {
+    try { await ctx.resume(); } catch(e) {}
+  }
+  isAudioUnlocked = true;
+  playLoudAlarmTone();
+  setTimeout(playLoudAlarmTone, 750);
 
-    // 2. Request notification permission
-    const perm = await requestNotificationPermission(true);
+  // 2. Vibrate phone
+  if ("vibrate" in navigator) {
+    try { navigator.vibrate([250, 100, 250]); } catch(e) {}
+  }
 
-    // 3. Vibrate
-    if ("vibrate" in navigator) {
-      try { navigator.vibrate([200, 100, 200]); } catch(e) {}
-    }
+  // 3. Test TTS Voice
+  speakReminder("Test sunet și alarme reușit!");
 
-    // 4. Test TTS
-    speakReminder("Test sunet și alarme reușit!");
-
-    // 5. Send test notification
-    if (perm === "granted") {
+  // 4. Request Notification Permission
+  let permStatus = "default";
+  if ("Notification" in window) {
+    permStatus = Notification.permission;
+    if (permStatus === "default") {
       try {
-        new Notification("🔔 Pandele: Alerte Active!", {
-          body: "Sunetul de alarmă și notificările sunt activate pe acest dispozitiv!",
-          icon: "/static/icons/icon-192.png"
-        });
-      } catch(e) {}
+        permStatus = await Notification.requestPermission();
+      } catch(e) {
+        try {
+          Notification.requestPermission((p) => { permStatus = p; });
+        } catch(err) {}
+      }
     }
 
-    // 6. Update UI
-    localStorage.setItem("pandele_audio_tested", "true");
-    testAndEnableAudioBtn.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4"></i><span>Sunet & Alerte Active ✓</span>`;
-    testAndEnableAudioBtn.className = "px-3.5 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs shadow-md transition flex items-center gap-1.5";
-    lucide.createIcons();
+    if (permStatus === "granted") {
+      try {
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: "SHOW_REMINDER_NOTIFICATION",
+            title: "🔔 Pandele: Alerte Active!",
+            body: "Sunetul de alarmă și notificările sunt activate pe acest dispozitiv!"
+          });
+        } else {
+          new Notification("🔔 Pandele: Alerte Active!", {
+            body: "Sunetul de alarmă și notificările sunt activate pe acest dispozitiv!",
+            icon: "/static/icons/icon-192.png"
+          });
+        }
+      } catch(e) {}
+    } else if (permStatus === "denied") {
+      alert("ℹ️ Notificările sunt momentan blocate în setările browserului pentru acest site.\n\nSunetul și alarmele audio funcționează perfect!\n\nDacă doriți și notificări pop-up:\n1. Apăsați pe pictograma 🔒 (lângă bara de adrese).\n2. Schimbați 'Notificări' din 'Blocat' în 'Permite'.\n3. Reîncărcați pagina.");
+    }
+  } else {
+    alert("Browserul nu acceptă notificări Web push. Pe iPhone, adăugați pe ecranul principal (Partajare -> Adaugă pe ecranul principal).");
+  }
 
-    setTimeout(() => {
-      if (audioUnlockBanner) {
-        audioUnlockBanner.classList.add("hidden");
-      }
-    }, 3500);
-  });
+  // 5. Update UI
+  localStorage.setItem("pandele_audio_tested", "true");
+  if (btn) {
+    btn.innerHTML = `<span class="flex items-center gap-1.5"><i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i><span>Sunet & Alerte Active ✓</span></span>`;
+    btn.className = "px-3.5 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs shadow-md transition flex items-center gap-1.5";
+    if (window.lucide) lucide.createIcons();
+  }
+
+  updateNotificationButtonState();
+
+  setTimeout(() => {
+    const banner = document.getElementById("audioUnlockBanner");
+    if (banner) {
+      banner.classList.add("hidden");
+    }
+  }, 4000);
+}
+
+function initAudioBanner() {
+  const isTested = localStorage.getItem("pandele_audio_tested") === "true";
+  const banner = document.getElementById("audioUnlockBanner");
+  if (isTested && "Notification" in window && Notification.permission === "granted") {
+    if (banner) banner.style.display = "none";
+  }
+
+  const btn = document.getElementById("testAndEnableAudioBtn");
+  btn?.addEventListener("click", testAndEnableAudio);
 }
 
 // ==========================================
@@ -731,3 +773,4 @@ window.checkDueReminders = checkDueReminders;
 window.toggleReminder = toggleReminder;
 window.deleteReminder = deleteReminder;
 window.snoozeReminder = snoozeReminder;
+window.testAndEnableAudio = testAndEnableAudio;

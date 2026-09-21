@@ -1,20 +1,6 @@
-const CACHE_NAME = 'momo-agent-v2';
-const ASSETS_TO_CACHE = [
-  '/',
-  '/manifest.json',
-  '/static/style.css',
-  '/static/app.js',
-  '/static/icons/icon-192.png',
-  '/static/icons/icon-512.png',
-  '/static/icons/icon.svg'
-];
+const CACHE_NAME = 'momo-agent-v3';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
-  );
   self.skipWaiting();
 });
 
@@ -32,19 +18,23 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Network-first for API requests
-  if (url.pathname.startsWith('/api/')) {
+  // Network-first for API requests, HTML pages, and JS scripts (ensures instant updates)
+  if (url.pathname.startsWith('/api/') || url.pathname.endsWith('.js') || url.pathname === '/' || url.pathname.endsWith('.html')) {
     event.respondWith(
-      fetch(event.request).catch(() => {
-        return new Response(JSON.stringify({ error: 'Sunteți offline' }), {
-          headers: { 'Content-Type': 'application/json' }
-        });
-      })
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request))
     );
     return;
   }
 
-  // Cache-first with network fallback for static files
+  // Cache-first with network fallback for images and icons
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       return (

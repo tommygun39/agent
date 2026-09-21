@@ -180,7 +180,7 @@
             <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
             <span id="audioBannerText">🔔 Pentru a primi <strong>alerte sonore & notificări</strong> pe telefon la scadență:</span>
           </div>
-          <button id="testAndEnableAudioBtn" class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 transition flex items-center gap-1.5 flex-shrink-0 cursor-pointer">
+          <button id="testAndEnableAudioBtn" onclick="if(typeof window.testAndEnableAudio === 'function') window.testAndEnableAudio();" class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 transition flex items-center gap-1.5 flex-shrink-0 cursor-pointer active:scale-95">
             <i data-lucide="volume-2" class="w-3.5 h-3.5"></i>
             <span>Activează & Testează Sunetul</span>
           </button>
@@ -563,8 +563,8 @@
     </div>
   </div>
 
-  <script src="/static/app.js"></script>
-  <script src="/static/reminders.js"></script>
-  <script src="/static/notes.js"></script>
+  <script src="/static/app.js?v=2.2.0"></script>
+  <script src="/static/reminders.js?v=2.2.0"></script>
+  <script src="/static/notes.js?v=2.2.0"></script>
 </body>
 </html>
