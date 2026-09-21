@@ -198,3 +198,58 @@ class ReminderService:
             d['is_completed'] = bool(d['is_completed'])
             return d
         return None
+
+    @staticmethod
+    def sync_reminders(client_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Sincronizează o listă de remindere trimisă de client (din localStorage) cu baza de date.
+        Re-hidratează baza de date după restartări de container efemer pe Render."""
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        now = now_ro_iso()
+        
+        for item in client_items:
+            rem_id = item.get('id')
+            if not rem_id:
+                continue
+            title = (item.get('title') or '').strip()
+            if not title:
+                continue
+            due_date_time = str(item.get('due_date_time') or '').strip()
+            priority = item.get('priority') or 'normal'
+            category = item.get('category') or 'general'
+            is_completed = 1 if item.get('is_completed') else 0
+            notes = item.get('notes') or ''
+            created_at = item.get('created_at') or now
+            updated_at = item.get('updated_at') or now
+            
+            cursor.execute('SELECT id, updated_at FROM reminders WHERE id = ?', (rem_id,))
+            existing = cursor.fetchone()
+            if not existing:
+                cursor.execute(
+                    '''
+                    INSERT INTO reminders (id, title, due_date_time, priority, category, is_completed, google_event_id, notes, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?)
+                    ''',
+                    (rem_id, title, due_date_time, priority, category, is_completed, notes, created_at, updated_at)
+                )
+            else:
+                cursor.execute(
+                    '''
+                    UPDATE reminders
+                    SET title = ?, due_date_time = ?, priority = ?, category = ?, is_completed = ?, notes = ?, updated_at = ?
+                    WHERE id = ?
+                    ''',
+                    (title, due_date_time, priority, category, is_completed, notes, updated_at, rem_id)
+                )
+        conn.commit()
+        
+        cursor.execute('SELECT * FROM reminders ORDER BY is_completed ASC, due_date_time ASC')
+        rows = cursor.fetchall()
+        conn.close()
+        
+        results = []
+        for r in rows:
+            d = dict(r)
+            d['is_completed'] = bool(d['is_completed'])
+            results.append(d)
+        return results

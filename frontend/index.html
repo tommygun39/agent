@@ -258,6 +258,17 @@
           </button>
         </div>
 
+        <!-- Persistence & Sync Status Badge -->
+        <div class="flex items-center justify-between text-[11px] px-1 text-slate-400">
+          <div class="flex items-center gap-1.5 text-emerald-400">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+            <span>Stocare persistentă activă (salvat pe dispozitiv & sincronizat)</span>
+          </div>
+          <button onclick="if(typeof syncReminders === 'function') syncReminders();" class="hover:text-white flex items-center gap-1 text-slate-400 text-xs cursor-pointer">
+            <i data-lucide="refresh-cw" class="w-3 h-3"></i> Sincronizează
+          </button>
+        </div>
+
         <!-- Reminders List -->
         <div id="remindersCardList" class="space-y-2">
           <!-- Dynamically populated via JS -->

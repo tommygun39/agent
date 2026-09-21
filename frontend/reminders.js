@@ -1,4 +1,4 @@
-// Reminders Module for Momo Agent with Live Audio Alarm, Web Audio Chimes & Push Notifications
+// Reminders Module for Pandele Agent with LocalStorage Persistence, Bidirectional Server Sync & Robust Alarms
 let currentRemFilter = "all";
 const alertedReminderIds = new Set();
 let activeAlarmReminder = null;
@@ -27,7 +27,153 @@ const alarmModalTime = document.getElementById("alarmModalTime");
 const alarmDismissBtn = document.getElementById("alarmDismissBtn");
 const alarmCompleteBtn = document.getElementById("alarmCompleteBtn");
 
-// 1. Web Audio Unlocker (Crucial for iOS Safari & Android Chrome autoplay policy)
+// ==========================================
+// 1. Time Utilities (Romanian Timezone)
+// ==========================================
+function getNowRoISO() {
+  try {
+    const formatter = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "Europe/Bucharest",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit"
+    });
+    return formatter.format(new Date()).replace(" ", "T");
+  } catch (e) {
+    return new Date().toISOString().substring(0, 19);
+  }
+}
+
+function getTodayRoStr() {
+  return getNowRoISO().substring(0, 10);
+}
+
+// ==========================================
+// 2. Persistent Storage (LocalStorage Backup)
+// ==========================================
+const REMINDERS_STORAGE_KEY = "pandele_saved_reminders";
+
+function getStoredReminders() {
+  try {
+    const raw = localStorage.getItem(REMINDERS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function setStoredReminders(items) {
+  try {
+    localStorage.setItem(REMINDERS_STORAGE_KEY, JSON.stringify(items));
+  } catch (e) {}
+}
+
+function mergeReminders(localList, serverList) {
+  const map = new Map();
+  // Server items
+  for (const s of serverList) {
+    if (s && s.id) map.set(s.id, s);
+  }
+  // Local items: if not on server or local has newer edit, keep/update
+  for (const loc of localList) {
+    if (!loc || !loc.id) continue;
+    if (!map.has(loc.id)) {
+      map.set(loc.id, loc);
+    } else {
+      const serv = map.get(loc.id);
+      const locUpdated = loc.updated_at || loc.created_at || "";
+      const servUpdated = serv.updated_at || serv.created_at || "";
+      if (locUpdated > servUpdated) {
+        map.set(loc.id, { ...serv, ...loc });
+      }
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => {
+    if (a.is_completed !== b.is_completed) return a.is_completed ? 1 : -1;
+    return (a.due_date_time || "").localeCompare(b.due_date_time || "");
+  });
+}
+
+function filterRemindersList(items, filterType) {
+  const todayStr = getTodayRoStr();
+  if (filterType === "today") {
+    return items.filter(r => (r.due_date_time || "").startsWith(todayStr));
+  } else if (filterType === "upcoming") {
+    return items.filter(r => !r.is_completed);
+  } else if (filterType === "completed") {
+    return items.filter(r => r.is_completed);
+  }
+  return items; // "all"
+}
+
+function updateRemindersBadgeFromList(items) {
+  try {
+    const todayStr = getTodayRoStr();
+    const activeToday = items.filter(r => !r.is_completed && (r.due_date_time || "").startsWith(todayStr)).length;
+    const allActive = items.filter(r => !r.is_completed).length;
+
+    const sidebarBadge = document.getElementById("sidebarRemindersBadge");
+    if (sidebarBadge) sidebarBadge.innerText = allActive;
+
+    const pill = document.getElementById("headerRemindersPill");
+    const text = document.getElementById("headerRemindersText");
+    if (activeToday > 0 && pill && text) {
+      text.innerText = `${activeToday} remindere azi`;
+      pill.classList.remove("hidden");
+      pill.classList.add("flex");
+    } else if (pill) {
+      pill.classList.add("hidden");
+    }
+  } catch (e) {}
+}
+
+// ==========================================
+// 3. Bidirectional Sync Engine
+// ==========================================
+async function syncReminders(filterType = currentRemFilter) {
+  const localItems = getStoredReminders();
+  
+  // Render from local storage immediately so UI is never blank
+  if (localItems.length > 0) {
+    renderReminders(filterRemindersList(localItems, filterType));
+    updateRemindersBadgeFromList(localItems);
+  }
+
+  try {
+    const res = await fetch("/api/reminders/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(localItems)
+    });
+
+    if (res.ok) {
+      const serverItems = await res.json();
+      const merged = mergeReminders(localItems, serverItems);
+      setStoredReminders(merged);
+      renderReminders(filterRemindersList(merged, filterType));
+      updateRemindersBadgeFromList(merged);
+      checkDueRemindersLocal();
+      return merged;
+    }
+  } catch (err) {
+    console.warn("[Sync] Network or server sleeping, active in offline/localStorage mode:", err);
+  }
+
+  // Fallback to local storage
+  renderReminders(filterRemindersList(localItems, filterType));
+  updateRemindersBadgeFromList(localItems);
+  checkDueRemindersLocal();
+  return localItems;
+}
+
+// ==========================================
+// 4. Web Audio Unlocker & Audio Alarms
+// ==========================================
 function getAudioContext() {
   if (!globalAudioCtx) {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -57,7 +203,6 @@ function unlockAudioGlobal() {
   document.addEventListener(evt, unlockAudioGlobal, { passive: true });
 });
 
-// 2. Loud, energetic alarm sound generator (High-volume harmonic bell chimes)
 function playLoudAlarmTone() {
   try {
     const ctx = getAudioContext();
@@ -96,7 +241,7 @@ function playLoudAlarmTone() {
   }
 }
 
-// 3. Continuous repeating alarm loop (rings until user taps Dismiss or Complete)
+// Continuous repeating alarm loop (rings until user taps Dismiss or Complete)
 function startAlarmLoop(rem) {
   stopAlarmLoop();
   activeAlarmReminder = rem;
@@ -137,7 +282,7 @@ function stopAlarmLoop() {
   activeAlarmReminder = null;
 }
 
-// 4. Voice announcement
+// Voice announcement
 function speakReminder(title) {
   if (!("speechSynthesis" in window)) return;
   try {
@@ -149,7 +294,7 @@ function speakReminder(title) {
   } catch (e) {}
 }
 
-// 5. Native Notifications
+// Native Notifications (Service Worker + Browser Notification)
 function sendNativeNotification(rem) {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
 
@@ -180,36 +325,73 @@ function sendNativeNotification(rem) {
 }
 
 function showAlarmModal(rem) {
-  if (reminderAlarmModal && alarmModalTitle) {
-    alarmModalTitle.innerText = rem.title;
-    let timeFormatted = rem.due_date_time;
-    try {
-      timeFormatted = new Date(rem.due_date_time).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" });
-    } catch(e) {}
-    if (alarmModalTime) alarmModalTime.innerText = `Scadență: ${timeFormatted}`;
-    reminderAlarmModal.classList.remove("hidden");
-    lucide.createIcons();
+  if (!reminderAlarmModal || !alarmModalTitle) return;
+  alarmModalTitle.innerText = rem.title;
+  let timeFormatted = rem.due_date_time;
+  try {
+    timeFormatted = new Date(rem.due_date_time).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" });
+  } catch(e) {}
+
+  const nowRo = getNowRoISO();
+  let dueClean = (rem.due_date_time || "").trim().replace(" ", "T");
+  const isOverdue = dueClean && dueClean < nowRo;
+
+  if (alarmModalTime) {
+    alarmModalTime.innerHTML = isOverdue
+      ? `<span class="text-rose-400 font-bold">⚠️ Scadență depășită: ${timeFormatted}</span>`
+      : `<span class="text-amber-300 font-bold">🔔 Scadență acum: ${timeFormatted}</span>`;
   }
+  reminderAlarmModal.classList.remove("hidden");
+  lucide.createIcons();
 }
 
-// 6. Periodic Due Reminders Checker
-async function checkDueReminders() {
-  try {
-    const res = await fetch("/api/reminders/due");
-    if (!res.ok) return;
-    const dueList = await res.json();
+// ==========================================
+// 5. Autonomous Due Reminders Checker
+// ==========================================
+function checkDueRemindersLocal() {
+  const items = getStoredReminders();
+  const nowRo = getNowRoISO();
 
-    for (const rem of dueList) {
+  for (const rem of items) {
+    if (rem.is_completed) continue;
+    let dueClean = (rem.due_date_time || "").trim().replace(" ", "T");
+    if (dueClean.length === 16) dueClean += ":00";
+    if (dueClean.includes("+")) dueClean = dueClean.split("+")[0];
+    if (dueClean.endsWith("Z")) dueClean = dueClean.slice(0, -1);
+
+    if (dueClean && dueClean <= nowRo) {
       if (!alertedReminderIds.has(rem.id)) {
         alertedReminderIds.add(rem.id);
         startAlarmLoop(rem);
         break; // Trigger one alarm at a time
       }
     }
+  }
+}
+
+async function checkDueReminders() {
+  // 1. Instant local check (immune to network lag or server sleep)
+  checkDueRemindersLocal();
+
+  // 2. Also query server /api/reminders/due
+  try {
+    const res = await fetch("/api/reminders/due");
+    if (res.ok) {
+      const dueList = await res.json();
+      for (const rem of dueList) {
+        if (!alertedReminderIds.has(rem.id)) {
+          alertedReminderIds.add(rem.id);
+          startAlarmLoop(rem);
+          break;
+        }
+      }
+    }
   } catch (err) {}
 }
 
-// 7. Notification Button & Banner state
+// ==========================================
+// 6. Notification Permissions & Banner
+// ==========================================
 function updateNotificationButtonState() {
   if (!enableNotificationsBtn) return;
   if (!("Notification" in window)) {
@@ -221,14 +403,17 @@ function updateNotificationButtonState() {
     enableNotificationsBtn.title = "Alerte Sonore & Notificări Active ✓";
   } else {
     enableNotificationsBtn.className = "p-2 rounded-lg text-amber-400 hover:bg-slate-800 transition flex items-center gap-1 animate-pulse";
-    enableNotificationsBtn.title = "Apasă pentru a activa Alerte & Notificări";
+    enableNotificationsBtn.title = "Apasă pentru a activa Alerte & Notificări pe telefon";
   }
   lucide.createIcons();
 }
 
 async function requestNotificationPermission(userTriggered = false) {
   unlockAudioGlobal();
-  if (!("Notification" in window)) return;
+  if (!("Notification" in window)) {
+    alert("Browserul dumneavoastră nu acceptă notificări Web. Pe iPhone, asigurați-vă că ați adăugat aplicația pe ecranul principal (Add to Home Screen).");
+    return;
+  }
   if (Notification.permission === "default" || userTriggered) {
     try {
       const perm = await Notification.requestPermission();
@@ -239,7 +424,6 @@ async function requestNotificationPermission(userTriggered = false) {
   return Notification.permission;
 }
 
-// 8. Test Sound & Notification Button Handlers
 function initAudioBanner() {
   const isTested = localStorage.getItem("pandele_audio_tested") === "true";
   if (isTested && Notification.permission === "granted") {
@@ -267,7 +451,7 @@ function initAudioBanner() {
     if (perm === "granted") {
       try {
         new Notification("🔔 Pandele: Alerte Active!", {
-          body: "Sunetul de alarmă și notificările sunt activate pe acest telefon!",
+          body: "Sunetul de alarmă și notificările sunt activate pe acest dispozitiv!",
           icon: "/static/icons/icon-192.png"
         });
       } catch(e) {}
@@ -287,6 +471,9 @@ function initAudioBanner() {
   });
 }
 
+// ==========================================
+// 7. Reminders UI Lifecycle & CRUD
+// ==========================================
 function initReminders() {
   document.querySelectorAll(".rem-filter-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -319,29 +506,35 @@ function initReminders() {
   // Alarm modal buttons
   alarmCompleteBtn?.addEventListener("click", async () => {
     if (activeAlarmReminder) {
-      await fetch(`/api/reminders/${activeAlarmReminder.id}/toggle`, { method: "POST" });
-      loadReminders(currentRemFilter);
-      loadRemindersCount();
+      await toggleReminder(activeAlarmReminder.id);
     }
     stopAlarmLoop();
   });
 
   alarmDismissBtn?.addEventListener("click", async () => {
     if (activeAlarmReminder) {
-      await fetch(`/api/reminders/${activeAlarmReminder.id}/snooze?minutes=10`, { method: "POST" });
-      alertedReminderIds.delete(activeAlarmReminder.id); // allow it to alert again in 10 mins
-      loadReminders(currentRemFilter);
-      loadRemindersCount();
+      await snoozeReminder(activeAlarmReminder.id, 10);
     }
     stopAlarmLoop();
   });
 
-  // Background monitoring every 10 seconds
-  setInterval(checkDueReminders, 10000);
+  // Background monitoring every 5 seconds
+  setInterval(checkDueReminders, 5000);
   checkDueReminders();
+
+  // Catch-up check whenever user unlocks phone or switches back to tab
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") checkDueReminders();
+    if (document.visibilityState === "visible") {
+      checkDueReminders();
+      syncReminders(currentRemFilter);
+    }
   });
+  window.addEventListener("focus", () => {
+    checkDueReminders();
+  });
+
+  // Initial sync & render
+  syncReminders(currentRemFilter);
 }
 
 function setDefaultDueDateTime() {
@@ -353,42 +546,24 @@ function setDefaultDueDateTime() {
   if (remInputDue) remInputDue.value = formatted;
 }
 
-async function loadRemindersCount() {
-  try {
-    const res = await fetch("/api/reminders?filter_type=today");
-    const data = await res.json();
-    const count = data.filter(r => !r.is_completed).length;
-    const sidebarBadge = document.getElementById("sidebarRemindersBadge");
-    if (sidebarBadge) sidebarBadge.innerText = count;
-    const pill = document.getElementById("headerRemindersPill");
-    const text = document.getElementById("headerRemindersText");
-    if (count > 0 && pill && text) {
-      text.innerText = `${count} remindere azi`;
-      pill.classList.remove("hidden");
-      pill.classList.add("flex");
-    } else if (pill) {
-      pill.classList.add("hidden");
-    }
-  } catch (err) {}
-}
+async function loadReminders(filterType = currentRemFilter) {
+  const localList = getStoredReminders();
+  renderReminders(filterRemindersList(localList, filterType));
+  updateRemindersBadgeFromList(localList);
 
-async function loadReminders(filterType = "all") {
-  try {
-    const res = await fetch(`/api/reminders?filter_type=${filterType}`);
-    const items = await res.json();
-    renderReminders(items);
-  } catch (err) {
-    console.error("Eroare remindere:", err);
-  }
+  // Sync with backend in background
+  syncReminders(filterType);
 }
 
 function renderReminders(items) {
   if (!remindersCardList) return;
   remindersCardList.innerHTML = "";
-  if (items.length === 0) {
+  if (!items || items.length === 0) {
     remindersCardList.innerHTML = `<div class="text-center py-12 text-slate-500 text-xs">Nu există remindere în această categorie.</div>`;
     return;
   }
+
+  const nowRo = getNowRoISO();
 
   items.forEach((item) => {
     const card = document.createElement("div");
@@ -404,10 +579,17 @@ function renderReminders(items) {
     }
 
     let dateFormatted = item.due_date_time;
+    let isOverdue = false;
     try {
       const d = new Date(item.due_date_time);
       dateFormatted = d.toLocaleString("ro-RO", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+      const dueClean = (item.due_date_time || "").trim().replace(" ", "T");
+      isOverdue = !item.is_completed && dueClean && dueClean < nowRo;
     } catch(e) {}
+
+    const overdueBadge = isOverdue
+      ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">Restant</span>`
+      : "";
 
     card.innerHTML = `
       <div class="flex items-center gap-3 overflow-hidden flex-1">
@@ -415,9 +597,10 @@ function renderReminders(items) {
         <div class="truncate">
           <div class="text-sm font-medium ${item.is_completed ? "line-through text-slate-400" : "text-slate-100"} truncate">${escapeHtml(item.title)}</div>
           <div class="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
-            <span class="flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> ${dateFormatted}</span>
+            <span class="flex items-center gap-1 ${isOverdue ? 'text-amber-300 font-medium' : ''}"><i data-lucide="clock" class="w-3 h-3"></i> ${dateFormatted}</span>
+            ${overdueBadge}
             <span>•</span>
-            <span class="capitalize">${item.category}</span>
+            <span class="capitalize">${item.category || "general"}</span>
           </div>
         </div>
       </div>
@@ -428,15 +611,11 @@ function renderReminders(items) {
     `;
 
     card.querySelector(".rem-checkbox").addEventListener("change", async () => {
-      await fetch(`/api/reminders/${item.id}/toggle`, { method: "POST" });
-      loadReminders(currentRemFilter);
-      loadRemindersCount();
+      await toggleReminder(item.id);
     });
 
     card.querySelector(".delete-rem-btn").addEventListener("click", async () => {
-      await fetch(`/api/reminders/${item.id}`, { method: "DELETE" });
-      loadReminders(currentRemFilter);
-      loadRemindersCount();
+      await deleteReminder(item.id);
     });
 
     remindersCardList.appendChild(card);
@@ -451,27 +630,104 @@ async function saveNewReminder() {
     alert("Te rog să introduci titlul și data/ora scadenței.");
     return;
   }
+
+  const tempId = "rem-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7);
+  const nowISO = getNowRoISO();
+  const newRem = {
+    id: tempId,
+    title: title,
+    due_date_time: due,
+    priority: remInputPriority.value || "normal",
+    category: remInputCategory.value || "general",
+    is_completed: false,
+    notes: "",
+    created_at: nowISO,
+    updated_at: nowISO
+  };
+
+  // 1. Optimistic Local Save
+  const localList = getStoredReminders();
+  localList.unshift(newRem);
+  setStoredReminders(localList);
+  renderReminders(filterRemindersList(localList, currentRemFilter));
+  updateRemindersBadgeFromList(localList);
+
+  newReminderModal.classList.add("hidden");
+  remInputTitle.value = "";
+
+  // 2. Persist to Backend Server
   try {
-    await fetch("/api/reminders", {
+    const res = await fetch("/api/reminders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: title,
         due_date_time: due,
-        priority: remInputPriority.value,
-        category: remInputCategory.value
+        priority: newRem.priority,
+        category: newRem.category
       })
     });
-    newReminderModal.classList.add("hidden");
-    remInputTitle.value = "";
-    loadReminders(currentRemFilter);
-    loadRemindersCount();
+    if (res.ok) {
+      const created = await res.json();
+      const updatedList = getStoredReminders().map(r => r.id === tempId ? created : r);
+      setStoredReminders(updatedList);
+      renderReminders(filterRemindersList(updatedList, currentRemFilter));
+      updateRemindersBadgeFromList(updatedList);
+    }
   } catch (err) {
-    alert("Eroare salvare reminder");
+    console.warn("[Save] Saved locally, will sync when server is active:", err);
   }
 }
 
+async function toggleReminder(id) {
+  const list = getStoredReminders();
+  const target = list.find(r => r.id === id);
+  if (target) {
+    target.is_completed = !target.is_completed;
+    target.updated_at = getNowRoISO();
+    setStoredReminders(list);
+    renderReminders(filterRemindersList(list, currentRemFilter));
+    updateRemindersBadgeFromList(list);
+  }
+  try {
+    await fetch(`/api/reminders/${id}/toggle`, { method: "POST" });
+  } catch (e) {}
+}
+
+async function deleteReminder(id) {
+  const list = getStoredReminders().filter(r => r.id !== id);
+  setStoredReminders(list);
+  renderReminders(filterRemindersList(list, currentRemFilter));
+  updateRemindersBadgeFromList(list);
+  try {
+    await fetch(`/api/reminders/${id}`, { method: "DELETE" });
+  } catch (e) {}
+}
+
+async function snoozeReminder(id, minutes = 10) {
+  const list = getStoredReminders();
+  const target = list.find(r => r.id === id);
+  if (target) {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() + minutes);
+    target.due_date_time = d.toISOString().substring(0, 19);
+    target.updated_at = getNowRoISO();
+    setStoredReminders(list);
+    alertedReminderIds.delete(id); // Allow re-alerting
+    renderReminders(filterRemindersList(list, currentRemFilter));
+    updateRemindersBadgeFromList(list);
+  }
+  try {
+    await fetch(`/api/reminders/${id}/snooze?minutes=${minutes}`, { method: "POST" });
+  } catch (e) {}
+}
+
+// Window Globals for Cross-Module Access
+window.syncReminders = syncReminders;
 window.loadReminders = loadReminders;
-window.loadRemindersCount = loadRemindersCount;
+window.loadRemindersCount = () => updateRemindersBadgeFromList(getStoredReminders());
 window.playLoudAlarmTone = playLoudAlarmTone;
 window.checkDueReminders = checkDueReminders;
+window.toggleReminder = toggleReminder;
+window.deleteReminder = deleteReminder;
+window.snoozeReminder = snoozeReminder;

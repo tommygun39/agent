@@ -85,8 +85,25 @@ def test_all():
     assert "data: " in r.text
     print("   [OK] Chat SSE Streaming response OK!")
 
+    print("9. Testing Reminders Bidirectional Sync API...")
+    sync_item = {
+        "id": "sync-test-uuid-999",
+        "title": "Reminder salvat din localStorage",
+        "due_date_time": "2026-09-22T15:30:00",
+        "priority": "normal",
+        "category": "general",
+        "is_completed": False
+    }
+    r = client.post("/api/reminders/sync", json=[sync_item])
+    assert r.status_code == 200
+    matched = [rem for rem in r.json() if rem["id"] == "sync-test-uuid-999"]
+    assert len(matched) == 1
+    # Clean up test item
+    client.delete("/api/reminders/sync-test-uuid-999")
+    print("   [OK] Bidirectional Sync re-hydrates SQLite database flawlessly!")
+
     print("\n=========================================")
-    print("[SUCCESS] ALL 8 TESTS PASSED SUCCESSFULLY! 100% READY!")
+    print("[SUCCESS] ALL 9 TESTS PASSED SUCCESSFULLY! 100% READY!")
     print("=========================================")
 
 if __name__ == "__main__":

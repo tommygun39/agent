@@ -93,6 +93,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadSettings();
   loadConversations();
   if (typeof initReminders === "function") initReminders();
+  if (typeof syncReminders === "function") syncReminders();
   if (typeof initNotes === "function") initNotes();
   if (typeof loadRemindersCount === "function") loadRemindersCount();
   setupCoreEvents();
@@ -129,7 +130,11 @@ function switchView(view) {
     mainHeaderTitle.innerText = "Remindere & Agendă";
     modelSelectContainer.classList.add("hidden");
     document.querySelectorAll(".chat-only-nav").forEach(el => el.classList.add("hidden"));
-    if (typeof loadReminders === "function") loadReminders("all");
+    if (typeof syncReminders === "function") {
+      syncReminders("all");
+    } else if (typeof loadReminders === "function") {
+      loadReminders("all");
+    }
   } else if (view === "notes") {
     notesView.classList.remove("hidden");
     setClass(navTabNotes);
@@ -423,7 +428,11 @@ async function sendMessage() {
     sendBtn.disabled = false;
     scrollToBottom();
     loadConversations();
-    if (typeof loadRemindersCount === "function") loadRemindersCount();
+    if (typeof syncReminders === "function") {
+      syncReminders();
+    } else if (typeof loadRemindersCount === "function") {
+      loadRemindersCount();
+    }
   }
 }
 

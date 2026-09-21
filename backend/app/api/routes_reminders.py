@@ -19,6 +19,22 @@ class ReminderUpdate(BaseModel):
     category: Optional[str] = None
     notes: Optional[str] = None
 
+class ReminderSyncItem(BaseModel):
+    id: str
+    title: str
+    due_date_time: str
+    priority: Optional[str] = "normal"
+    category: Optional[str] = "general"
+    is_completed: Optional[bool] = False
+    notes: Optional[str] = ""
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+@router.post('/reminders/sync')
+def sync_reminders(items: List[ReminderSyncItem]):
+    dict_items = [it.dict() for it in items]
+    return ReminderService.sync_reminders(dict_items)
+
 @router.get('/reminders')
 def get_reminders(filter_type: str = Query('all', enum=['all', 'today', 'upcoming', 'completed'])):
     return ReminderService.list_reminders(filter_type)
